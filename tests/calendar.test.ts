@@ -4,12 +4,22 @@ import {
   buildWeeklyCalendar,
   includeNextAiringEvents,
   formatLocalAiringTime,
+  getAnimeSeason,
   getLocalDateKey,
   getNextUp,
   groupAiringEventsByDay
 } from "../features/calendar/calendar";
 
 describe("calendar time conversion", () => {
+  it.each([
+    [new Date(2026, 0, 15), { season: "WINTER", year: 2026 }],
+    [new Date(2026, 3, 1), { season: "SPRING", year: 2026 }],
+    [new Date(2026, 6, 1), { season: "SUMMER", year: 2026 }],
+    [new Date(2026, 9, 4), { season: "FALL", year: 2026 }]
+  ])("maps %s to its anime season", (date, expected) => {
+    expect(getAnimeSeason(date)).toEqual(expected);
+  });
+
   it("converts UTC timestamps into the requested local timezone", () => {
     const timestamp = Date.parse("2024-01-01T16:30:00Z") / 1000;
     expect(getLocalDateKey(timestamp, "Asia/Shanghai")).toBe("2024-01-02");

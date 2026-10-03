@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CalendarView } from "../../features/calendar/CalendarView";
 import { MyAnimeView } from "../../features/following/MyAnimeView";
+import { UpcomingAnimeView } from "../../features/upcoming/UpcomingAnimeView";
 import { AniListProvider } from "../../services/anime/AniListProvider";
 import { AnimeService } from "../../services/anime/AnimeService";
 import { BangumiTitleProvider } from "../../services/anime/BangumiTitleProvider";
@@ -15,7 +16,7 @@ const animeService = new AnimeService(
 );
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<"today" | "calendar" | "my-anime">("today");
+  const [activeTab, setActiveTab] = useState<"today" | "calendar" | "upcoming" | "my-anime">("today");
 
   return (
     <main className="popup-shell">
@@ -29,10 +30,13 @@ export function App() {
       <nav className="tab-bar" role="tablist" aria-label="功能导航">
         <TabButton active={activeTab === "today"} label="今日" onClick={() => setActiveTab("today")} />
         <TabButton active={activeTab === "calendar"} label="七日历" onClick={() => setActiveTab("calendar")} />
+        <TabButton active={activeTab === "upcoming"} label="新番" onClick={() => setActiveTab("upcoming")} />
         <TabButton active={activeTab === "my-anime"} label="我的追番" onClick={() => setActiveTab("my-anime")} />
       </nav>
       {activeTab === "my-anime" ? (
         <MyAnimeView animeService={animeService} repository={repository} />
+      ) : activeTab === "upcoming" ? (
+        <UpcomingAnimeView animeService={animeService} />
       ) : (
         <CalendarView
           animeService={animeService}

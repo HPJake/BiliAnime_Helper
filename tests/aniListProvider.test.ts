@@ -73,6 +73,40 @@ describe("AniListProvider", () => {
     ]);
   });
 
+  it("retrieves every upcoming schedule page for the current anime season", async () => {
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: { page: number; mediaIds?: number[] };
+      };
+      if (body.query.includes("SeasonAnime")) {
+        return Response.json({ data: { Page: {
+          pageInfo: { hasNextPage: false },
+          media: [
+            { id: 10, title: { romaji: "Season A" }, isAdult: false },
+            { id: 20, title: { romaji: "Season B" }, isAdult: false }
+          ]
+        } } });
+      }
+      return Response.json({ data: { Page: {
+        pageInfo: { hasNextPage: body.variables.page === 1 },
+        airingSchedules: body.variables.page === 1
+          ? [{ mediaId: 20, episode: 2, airingAt: 200 }]
+          : [{ mediaId: 10, episode: 1, airingAt: 100 }]
+      } } });
+    });
+    const provider = new AniListProvider(fetcher);
+
+    const schedule = await provider.getUpcomingAnimeSchedule(50, 250, "FALL", 2026);
+
+    expect(schedule.anime.map((anime) => anime.id)).toEqual([10, 20]);
+    expect(schedule.events).toEqual([
+      { animeId: 10, episode: 1, airingAt: 100 },
+      { animeId: 20, episode: 2, airingAt: 200 }
+    ]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
   it("walks sequel relations so following an older season includes the airing season", async () => {
     const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body)) as { variables: { ids: number[] } };

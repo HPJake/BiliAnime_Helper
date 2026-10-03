@@ -1,4 +1,5 @@
 import type { AiringEvent } from "../../domain/airing";
+import type { AnimeSeason } from "../../domain/airing";
 import type { Anime } from "../../domain/anime";
 
 export type CalendarItem = {
@@ -19,6 +20,18 @@ export type CalendarRange = {
   from: number;
   to: number;
 };
+
+export function getAnimeSeason(date = new Date()): { season: AnimeSeason; year: number } {
+  const month = date.getMonth();
+  const season: AnimeSeason = month < 3
+    ? "WINTER"
+    : month < 6
+      ? "SPRING"
+      : month < 9
+        ? "SUMMER"
+        : "FALL";
+  return { season, year: date.getFullYear() };
+}
 
 export function includeNextAiringEvents(
   events: AiringEvent[],

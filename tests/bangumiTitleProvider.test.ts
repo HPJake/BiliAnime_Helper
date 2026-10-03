@@ -23,4 +23,16 @@ describe("BangumiTitleProvider", () => {
     const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({ keyword: "药屋少女的呢喃", filter: { type: [2], nsfw: false } });
   });
+
+  it("maps the weekly calendar into one Chinese title list", async () => {
+    const provider = new BangumiTitleProvider(async () => Response.json([
+      { weekday: { cn: "星期日" }, items: [
+        { name: "アオのハコ Season２", name_cn: "青春之箱 第二季" }
+      ] }
+    ]));
+
+    await expect(provider.getCalendarTitles()).resolves.toEqual([
+      { native: "アオのハコ Season２", chinese: "青春之箱 第二季" }
+    ]);
+  });
 });

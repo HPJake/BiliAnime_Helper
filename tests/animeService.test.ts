@@ -10,6 +10,7 @@ function createProvider(): AnimeProvider {
     getAnime: vi.fn(async (id: number) => ({ id, title: { romaji: "Fresh" }, synonyms: [] })),
     getAnimeSeries: vi.fn(async (id: number) => [{ id, title: { romaji: "Fresh" }, synonyms: [] }]),
     getAiringSchedule: vi.fn(async () => []),
+    getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
     getTrending: vi.fn(async () => [])
   };
 }
@@ -82,5 +83,20 @@ describe("AnimeService", () => {
       stale: false
     });
     expect(provider.getAiringSchedule).not.toHaveBeenCalled();
+  });
+
+  it("caches the seasonal upcoming schedule", async () => {
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => 1_000);
+    const provider = createProvider();
+    vi.mocked(provider.getUpcomingAnimeSchedule).mockResolvedValueOnce({
+      anime: [{ id: 1, title: { romaji: "Season" }, synonyms: [] }],
+      events: [{ animeId: 1, episode: 1, airingAt: 150 }]
+    });
+    const service = new AnimeService(provider, cache, () => 1_000);
+
+    expect((await service.getUpcomingAnimeSchedule(100, 200, "FALL", 2026)).source).toBe("network");
+    expect((await service.getUpcomingAnimeSchedule(100, 200, "FALL", 2026)).source).toBe("cache");
+    expect(provider.getUpcomingAnimeSchedule).toHaveBeenCalledTimes(1);
   });
 });

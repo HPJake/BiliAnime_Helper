@@ -1,4 +1,4 @@
-import type { AiringEvent } from "../../domain/airing";
+import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime, AnimeTitle } from "../../domain/anime";
 import type { AnimeProvider } from "./AnimeProvider";
 import { AnimeApiError, normalizeApiError, parseRetryAfter } from "./errors";
@@ -7,6 +7,8 @@ import {
   ANIME_BY_ID_QUERY,
   ANIME_SERIES_QUERY,
   SEARCH_ANIME_QUERY,
+  SEASON_ANIME_QUERY,
+  UPCOMING_AIRING_QUERY,
   TRENDING_ANIME_QUERY
 } from "./queries";
 
@@ -104,6 +106,49 @@ export class AniListProvider implements AnimeProvider {
       .map(mapAniListAiring)
       .filter((event): event is AiringEvent => event !== null)
       .sort((left, right) => left.airingAt - right.airingAt);
+  }
+
+  async getUpcomingAnimeSchedule(
+    from: number,
+    to: number,
+    season: AnimeSeason,
+    seasonYear: number
+  ): Promise<UpcomingAnimeSchedule> {
+    const anime: Anime[] = [];
+    for (let page = 1; page <= 100; page += 1) {
+      const data = await this.request<{
+        Page?: {
+          pageInfo?: { hasNextPage?: boolean | null } | null;
+          media?: AniListMedia[] | null;
+        } | null;
+      }>(SEASON_ANIME_QUERY, { page, season, seasonYear });
+      anime.push(...mapAnimeList(data.Page?.media));
+      if (data.Page?.pageInfo?.hasNextPage !== true) break;
+    }
+
+    const mediaIds = [...new Set(anime.map((item) => item.id))];
+    if (mediaIds.length === 0) return { anime: [], events: [] };
+
+    const events: AiringEvent[] = [];
+    for (let page = 1; page <= 100; page += 1) {
+      const data = await this.request<{
+        Page?: {
+          pageInfo?: { hasNextPage?: boolean | null } | null;
+          airingSchedules?: AniListAiring[] | null;
+        } | null;
+      }>(UPCOMING_AIRING_QUERY, { page, from, to, mediaIds });
+      events.push(
+        ...(data.Page?.airingSchedules ?? [])
+          .map(mapAniListAiring)
+          .filter((event): event is AiringEvent => event !== null)
+      );
+      if (data.Page?.pageInfo?.hasNextPage !== true) break;
+    }
+
+    return {
+      anime,
+      events: dedupeAiringEvents(events)
+    };
   }
 
   async getTrending(limit = 20): Promise<Anime[]> {
@@ -220,6 +265,13 @@ function mapAniListAiring(event: AniListAiring): AiringEvent | null {
     episode: Number(event.episode),
     airingAt: Number(event.airingAt)
   };
+}
+
+function dedupeAiringEvents(events: AiringEvent[]): AiringEvent[] {
+  return [...new Map(events.map((event) => [
+    `${event.animeId}:${event.episode}:${event.airingAt}`,
+    event
+  ])).values()].sort((left, right) => left.airingAt - right.airingAt);
 }
 
 function compactTitle(title: AniListMedia["title"]): AnimeTitle {

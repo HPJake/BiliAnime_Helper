@@ -66,6 +66,42 @@ export const AIRING_SCHEDULE_QUERY = `
   }
 `;
 
+export const SEASON_ANIME_QUERY = `
+  query SeasonAnime($page: Int!, $season: MediaSeason!, $seasonYear: Int!) {
+    Page(page: $page, perPage: 50) {
+      pageInfo { hasNextPage }
+      media(
+        type: ANIME
+        season: $season
+        seasonYear: $seasonYear
+        countryOfOrigin: JP
+        isAdult: false
+        sort: POPULARITY_DESC
+      ) {
+        ${ANIME_FIELDS}
+      }
+    }
+  }
+`;
+
+export const UPCOMING_AIRING_QUERY = `
+  query UpcomingAiring($page: Int!, $from: Int!, $to: Int!, $mediaIds: [Int]) {
+    Page(page: $page, perPage: 50) {
+      pageInfo { hasNextPage }
+      airingSchedules(
+        mediaId_in: $mediaIds
+        airingAt_greater: $from
+        airingAt_lesser: $to
+        sort: TIME
+      ) {
+        mediaId
+        episode
+        airingAt
+      }
+    }
+  }
+`;
+
 export const TRENDING_ANIME_QUERY = `
   query TrendingAnime($perPage: Int!) {
     Page(page: 1, perPage: $perPage) {

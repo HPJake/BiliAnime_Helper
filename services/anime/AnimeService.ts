@@ -1,4 +1,4 @@
-import type { AiringEvent } from "../../domain/airing";
+import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime } from "../../domain/anime";
 import { CacheRepository, isCacheFresh } from "../../utils/cache";
 import type { AnimeProvider } from "./AnimeProvider";
@@ -61,6 +61,28 @@ export class AnimeService {
     to: number
   ): Promise<AnimeDataResult<AiringEvent[]> | null> {
     return this.peek(`airing:${animeId}:${from}:${to}`);
+  }
+
+  getUpcomingAnimeSchedule(
+    from: number,
+    to: number,
+    season: AnimeSeason,
+    seasonYear: number
+  ): Promise<AnimeDataResult<UpcomingAnimeSchedule>> {
+    return this.load(
+      `upcoming:v1:${season}:${seasonYear}:${from}:${to}`,
+      CACHE_TTL.airing,
+      () => this.provider.getUpcomingAnimeSchedule(from, to, season, seasonYear)
+    );
+  }
+
+  getCachedUpcomingAnimeSchedule(
+    from: number,
+    to: number,
+    season: AnimeSeason,
+    seasonYear: number
+  ): Promise<AnimeDataResult<UpcomingAnimeSchedule> | null> {
+    return this.peek(`upcoming:v1:${season}:${seasonYear}:${from}:${to}`);
   }
 
   getTrending(limit = 20): Promise<AnimeDataResult<Anime[]>> {

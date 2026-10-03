@@ -1,4 +1,4 @@
-import type { AiringEvent } from "../../domain/airing";
+import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime } from "../../domain/anime";
 import type { AnimeProvider } from "./AnimeProvider";
 import type { ChineseTitleMatch, ChineseTitleProvider } from "./BangumiTitleProvider";
@@ -49,6 +49,25 @@ export class LocalizedAnimeProvider implements AnimeProvider {
     return this.animeProvider.getAiringSchedule(animeId, from, to);
   }
 
+  async getUpcomingAnimeSchedule(
+    from: number,
+    to: number,
+    season: AnimeSeason,
+    seasonYear: number
+  ): Promise<UpcomingAnimeSchedule> {
+    const schedule = await this.animeProvider.getUpcomingAnimeSchedule(
+      from,
+      to,
+      season,
+      seasonYear
+    );
+    const matches = await this.safeCalendarTitles();
+    return {
+      ...schedule,
+      anime: enrichAndDedupe(schedule.anime, matches)
+    };
+  }
+
   getTrending(limit?: number): Promise<Anime[]> {
     return this.animeProvider.getTrending(limit);
   }
@@ -56,6 +75,15 @@ export class LocalizedAnimeProvider implements AnimeProvider {
   private async safeSearchTitles(query: string, limit: number): Promise<ChineseTitleMatch[]> {
     try {
       return await this.chineseTitles.searchTitles(query, limit);
+    } catch {
+      return [];
+    }
+  }
+
+
+  private async safeCalendarTitles(): Promise<ChineseTitleMatch[]> {
+    try {
+      return await this.chineseTitles.getCalendarTitles();
     } catch {
       return [];
     }
@@ -75,5 +103,5 @@ function enrichAnime(anime: Anime, matches: ChineseTitleMatch[]): Anime {
 }
 
 function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase();
+  return value.normalize("NFKC").trim().toLocaleLowerCase();
 }
