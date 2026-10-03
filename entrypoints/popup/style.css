@@ -1,0 +1,15 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #18191c;
+  background: #f6f7f8;
+}
+
+body { margin: 0; min-width: 360px; }
+.popup-shell { padding: 20px; }
+header { display: flex; align-items: center; gap: 10px; }
+h1 { font-size: 18px; margin: 0; }
+.brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: white; background: #00aeec; font-weight: 800; }
+.subtitle { color: #61666d; margin: 8px 0 20px; }
+.empty-state { display: grid; gap: 6px; padding: 24px 16px; border: 1px solid #e3e5e7; border-radius: 10px; background: white; }
+.empty-state span, footer { color: #9499a0; font-size: 12px; }
+footer { margin-top: 20px; }
