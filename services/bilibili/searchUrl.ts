@@ -13,5 +13,9 @@ export function getBilibiliSearchTitle(anime: Anime, bilibiliSearchAlias?: strin
 
 export function createBilibiliSearchUrl(anime: Anime, bilibiliSearchAlias?: string): string {
   const title = getBilibiliSearchTitle(anime, bilibiliSearchAlias);
-  return `https://search.bilibili.com/all?keyword=${encodeURIComponent(title)}`;
+  return createBilibiliSearchUrlFromTitle(title);
+}
+
+export function createBilibiliSearchUrlFromTitle(title: string): string {
+  return `https://search.bilibili.com/all?keyword=${encodeURIComponent(title.trim())}`;
 }

@@ -50,4 +50,33 @@ describe("AppRepository", () => {
 
     expect(await repository.getFollowedAnime()).toEqual([{ aniListId: 2, addedAt: 10 }]);
   });
+
+  it("migrates notification storage and persists scheduled events", async () => {
+    const storage = new MemoryStorage();
+    await storage.set({
+      [STORAGE_KEYS.schemaVersion]: 1,
+      [STORAGE_KEYS.notificationState]: {
+        notifiedEventIds: ["1:1:100", 123],
+        unseenEventIds: ["1:1:100"]
+      }
+    });
+    const repository = new AppRepository(storage);
+
+    await repository.initialize();
+    await repository.saveScheduledAiringEvents([{
+      animeId: 1,
+      followedAnimeId: 1,
+      episode: 1,
+      airingAt: 100,
+      title: "Anime",
+      searchTitle: "动画"
+    }]);
+
+    expect(await repository.getNotificationState()).toEqual({
+      notifiedEventIds: ["1:1:100"],
+      unseenEventIds: ["1:1:100"]
+    });
+    expect(await repository.getScheduledAiringEvents()).toHaveLength(1);
+    expect(storage.values.get(STORAGE_KEYS.schemaVersion)).toBe(STORAGE_SCHEMA_VERSION);
+  });
 });

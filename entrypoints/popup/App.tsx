@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { browser } from "wxt/browser";
 import { CalendarView } from "../../features/calendar/CalendarView";
 import { MyAnimeView } from "../../features/following/MyAnimeView";
 import { UpcomingAnimeView } from "../../features/upcoming/UpcomingAnimeView";
@@ -17,6 +18,10 @@ const animeService = new AnimeService(
 
 export function App() {
   const [activeTab, setActiveTab] = useState<"today" | "calendar" | "upcoming" | "my-anime">("today");
+
+  useEffect(() => {
+    void browser.runtime.sendMessage({ type: "popup-opened" }).catch(() => undefined);
+  }, []);
 
   return (
     <main className="popup-shell">

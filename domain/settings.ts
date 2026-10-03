@@ -1,3 +1,5 @@
+import type { AiringEvent } from "./airing";
+
 export type AppSettings = {
   notificationsEnabled: boolean;
   badgeEnabled: boolean;
@@ -7,6 +9,12 @@ export type AppSettings = {
 export type NotificationState = {
   notifiedEventIds: string[];
   unseenEventIds: string[];
+};
+
+export type ScheduledAiringEvent = AiringEvent & {
+  followedAnimeId: number;
+  title: string;
+  searchTitle: string;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {

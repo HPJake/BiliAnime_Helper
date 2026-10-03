@@ -6,7 +6,8 @@ export async function runStorageMigrations(storage: StorageArea): Promise<void> 
     STORAGE_KEYS.schemaVersion,
     STORAGE_KEYS.followedAnime,
     STORAGE_KEYS.settings,
-    STORAGE_KEYS.notificationState
+    STORAGE_KEYS.notificationState,
+    STORAGE_KEYS.scheduledAiringEvents
   ]);
   const version = current[STORAGE_KEYS.schemaVersion];
 
@@ -18,14 +19,42 @@ export async function runStorageMigrations(storage: StorageArea): Promise<void> 
   if (!Array.isArray(current[STORAGE_KEYS.followedAnime])) {
     updates[STORAGE_KEYS.followedAnime] = DEFAULT_STORAGE.followedAnime;
   }
-  if (!isRecord(current[STORAGE_KEYS.settings])) {
-    updates[STORAGE_KEYS.settings] = DEFAULT_STORAGE.settings;
-  }
-  if (!isRecord(current[STORAGE_KEYS.notificationState])) {
-    updates[STORAGE_KEYS.notificationState] = DEFAULT_STORAGE.notificationState;
+  updates[STORAGE_KEYS.settings] = migrateSettings(current[STORAGE_KEYS.settings]);
+  updates[STORAGE_KEYS.notificationState] = migrateNotificationState(
+    current[STORAGE_KEYS.notificationState]
+  );
+  if (!Array.isArray(current[STORAGE_KEYS.scheduledAiringEvents])) {
+    updates[STORAGE_KEYS.scheduledAiringEvents] = DEFAULT_STORAGE.scheduledAiringEvents;
   }
 
   await storage.set(updates);
+}
+
+function migrateSettings(value: unknown) {
+  const stored = isRecord(value) ? value : {};
+  return {
+    notificationsEnabled:
+      typeof stored.notificationsEnabled === "boolean"
+        ? stored.notificationsEnabled
+        : DEFAULT_STORAGE.settings.notificationsEnabled,
+    badgeEnabled:
+      typeof stored.badgeEnabled === "boolean"
+        ? stored.badgeEnabled
+        : DEFAULT_STORAGE.settings.badgeEnabled,
+    timezoneMode: "local" as const
+  };
+}
+
+function migrateNotificationState(value: unknown) {
+  const stored = isRecord(value) ? value : {};
+  return {
+    notifiedEventIds: stringArray(stored.notifiedEventIds),
+    unseenEventIds: stringArray(stored.unseenEventIds)
+  };
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

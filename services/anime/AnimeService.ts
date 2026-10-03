@@ -42,7 +42,7 @@ export class AnimeService {
   }
 
   getAnimeSeries(id: number): Promise<AnimeDataResult<Anime[]>> {
-    return this.load(`series:v1:${id}`, CACHE_TTL.metadata, () => this.provider.getAnimeSeries(id));
+    return this.load(`series:v1:${id}`, CACHE_TTL.airing, () => this.provider.getAnimeSeries(id));
   }
 
   getAiringSchedule(
