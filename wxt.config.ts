@@ -3,9 +3,9 @@ export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   manifest: {
     name: "BiliAnime Helper",
-    description: "An unofficial anime dashboard and video rotation helper for Bilibili.",
+    description: "非官方哔哩哔哩追番日历与视频旋转助手。",
     permissions: ["storage", "alarms", "notifications"],
-    host_permissions: ["https://graphql.anilist.co/*"],
+    host_permissions: ["https://graphql.anilist.co/*", "https://api.bgm.tv/*"],
     action: {
       default_title: "BiliAnime Helper",
       default_popup: "popup.html"

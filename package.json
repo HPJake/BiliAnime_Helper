@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "build": "wxt build",
-    "dev": "wxt dev",
+    "dev": "wxt",
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

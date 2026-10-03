@@ -1,0 +1,55 @@
+export type ChineseTitleMatch = {
+  native: string;
+  chinese: string;
+};
+
+export interface ChineseTitleProvider {
+  searchTitles(query: string, limit?: number): Promise<ChineseTitleMatch[]>;
+}
+
+type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+const BANGUMI_SEARCH_ENDPOINT = "https://api.bgm.tv/v0/search/subjects";
+
+export class BangumiTitleProvider implements ChineseTitleProvider {
+  constructor(private readonly fetcher: Fetcher = fetch) {}
+
+  async searchTitles(query: string, limit = 10): Promise<ChineseTitleMatch[]> {
+    const keyword = query.trim();
+    if (!keyword) return [];
+    const url = `${BANGUMI_SEARCH_ENDPOINT}?limit=${clampLimit(limit)}&offset=0`;
+    const response = await this.fetcher.call(globalThis, url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        keyword,
+        sort: "match",
+        filter: { type: [2], nsfw: false }
+      })
+    });
+    if (!response.ok) throw new Error(`Bangumi request failed with HTTP ${response.status}`);
+    const payload: unknown = await response.json();
+    if (!isRecord(payload) || !Array.isArray(payload.data)) return [];
+
+    const matches = new Map<string, ChineseTitleMatch>();
+    for (const item of payload.data) {
+      if (!isRecord(item) || typeof item.name !== "string" || typeof item.name_cn !== "string") continue;
+      const native = item.name.trim();
+      const chinese = item.name_cn.trim();
+      if (native && chinese) matches.set(normalize(native), { native, chinese });
+    }
+    return [...matches.values()];
+  }
+}
+
+function clampLimit(limit: number): number {
+  return Math.min(20, Math.max(1, Math.trunc(limit)));
+}
+
+function normalize(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

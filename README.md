@@ -4,7 +4,7 @@ BiliAnime Helper is an unofficial Chrome/Edge Manifest V3 extension for Bilibili
 
 ## Current status
 
-M1 is complete. The extension includes the project scaffold and a Bilibili-only video rotation controller. Repeated 90° actions cycle through 0°, 90°, 180°, and 270°. The controller is anchored above the player's top-right corner and hides in fullscreen.
+M4 is complete. The popup now includes a Chinese Today view, a vertical seven-day timeline, sequel-aware scheduling, Chinese title search, manual following, and video rotation.
 
 ## Development
 
@@ -27,10 +27,17 @@ To load a production build, open `chrome://extensions`, enable Developer mode, c
 - `entrypoints/background.ts`: Manifest V3 service worker
 - `entrypoints/bilibili.content.ts`: content script limited to Bilibili video pages
 - `features/rotation`: isolated video detection, rotation lifecycle, and pure fit calculations
+- `domain`: normalized app types that do not expose AniList response objects
+- `services/anime`: provider abstraction, cached service, AniList schedules, and Bangumi Chinese-title enrichment
+- `storage`: schema migrations and the `chrome.storage.local` adapter
+- `utils/cache.ts`: persistent TTL cache used by anime data services
+- `features/following`: My Anime state and manual follow UI
+- `services/bilibili`: centralized title selection, URL generation, and tab opening
+- `features/calendar`: local-time grouping, cached schedule loading, Today, and Next Up UI
 - `domain`, `storage`, `services`, `features`, `components`: reserved boundaries for later milestones
 
-The extension requests only `storage`, `alarms`, and `notifications`, plus AniList GraphQL host access. It does not read Bilibili cookies or user account data.
+The extension requests only `storage`, `alarms`, and `notifications`, plus AniList and Bangumi API host access. It does not read Bilibili cookies or user account data.
 
 ## Privacy
 
-Followed anime and preferences will be stored locally in `chrome.storage.local`. Anime metadata will be fetched from AniList. Anime links will open Bilibili search pages. BiliAnime Helper is not affiliated with Bilibili or AniList.
+Followed anime and preferences are stored locally in `chrome.storage.local`. Airing metadata is fetched from AniList and Chinese titles are enriched from Bangumi. Anime links open Bilibili search pages. BiliAnime Helper is not affiliated with Bilibili, AniList, or Bangumi.

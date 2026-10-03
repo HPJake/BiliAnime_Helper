@@ -1,0 +1,86 @@
+import { describe, expect, it, vi } from "vitest";
+import type { AnimeProvider } from "../services/anime/AnimeProvider";
+import { AnimeService, CACHE_TTL } from "../services/anime/AnimeService";
+import { CacheRepository } from "../utils/cache";
+import { MemoryStorage } from "./helpers/memoryStorage";
+
+function createProvider(): AnimeProvider {
+  return {
+    searchAnime: vi.fn(async () => []),
+    getAnime: vi.fn(async (id: number) => ({ id, title: { romaji: "Fresh" }, synonyms: [] })),
+    getAnimeSeries: vi.fn(async (id: number) => [{ id, title: { romaji: "Fresh" }, synonyms: [] }]),
+    getAiringSchedule: vi.fn(async () => []),
+    getTrending: vi.fn(async () => [])
+  };
+}
+
+describe("AnimeService", () => {
+  it("loads fresh metadata from cache", async () => {
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => 1_000);
+    await cache.set("metadata:v2:1", { id: 1, title: { romaji: "Cached" }, synonyms: [] }, 500);
+    const provider = createProvider();
+    const service = new AnimeService(provider, cache, () => 1_200);
+
+    expect(await service.getAnime(1)).toEqual({
+      data: { id: 1, title: { romaji: "Cached" }, synonyms: [] },
+      source: "cache",
+      stale: false
+    });
+    expect(provider.getAnime).not.toHaveBeenCalled();
+  });
+
+  it("falls back to stale metadata when the API fails", async () => {
+    let time = 1_000;
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => time);
+    await cache.set("metadata:v2:1", { id: 1, title: { romaji: "Stale" }, synonyms: [] }, 100);
+    time = 2_000;
+    const provider = createProvider();
+    vi.mocked(provider.getAnime).mockRejectedValueOnce(new Error("offline"));
+    const service = new AnimeService(provider, cache, () => time);
+
+    expect(await service.getAnime(1)).toEqual({
+      data: { id: 1, title: { romaji: "Stale" }, synonyms: [] },
+      source: "cache",
+      stale: true
+    });
+  });
+
+  it("caches a network search using the search TTL", async () => {
+    let time = 10_000;
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => time);
+    const provider = createProvider();
+    vi.mocked(provider.searchAnime).mockResolvedValueOnce([
+      { id: 1, title: { romaji: "Result" }, synonyms: [] }
+    ]);
+    const service = new AnimeService(provider, cache, () => time);
+
+    expect((await service.searchAnime(" Result ")).source).toBe("network");
+    expect((await cache.get("search:result:10"))?.expiresAt).toBe(time + CACHE_TTL.search);
+
+    time += 100;
+    expect((await service.searchAnime("result")).source).toBe("cache");
+    expect(provider.searchAnime).toHaveBeenCalledTimes(1);
+  });
+
+  it("peeks cached schedules without triggering a network request", async () => {
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => 1_000);
+    await cache.set(
+      "airing:1:100:200",
+      [{ animeId: 1, episode: 3, airingAt: 150 }],
+      500
+    );
+    const provider = createProvider();
+    const service = new AnimeService(provider, cache, () => 1_200);
+
+    expect(await service.getCachedAiringSchedule(1, 100, 200)).toEqual({
+      data: [{ animeId: 1, episode: 3, airingAt: 150 }],
+      source: "cache",
+      stale: false
+    });
+    expect(provider.getAiringSchedule).not.toHaveBeenCalled();
+  });
+});
