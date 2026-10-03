@@ -91,6 +91,10 @@ export class AnimeService {
     );
   }
 
+  getCachedTrending(limit = 20): Promise<AnimeDataResult<Anime[]> | null> {
+    return this.peek(`trending:${limit}`);
+  }
+
   private async peek<T>(key: string): Promise<AnimeDataResult<T> | null> {
     const cached = await this.cache.get<T>(key);
     if (!cached) return null;

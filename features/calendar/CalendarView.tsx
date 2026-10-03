@@ -60,7 +60,7 @@ export function CalendarView({ animeService, mode, onOpenMyAnime, repository }: 
     : null;
 
   return (
-    <section className="calendar-view" aria-labelledby="calendar-view-title">
+    <section className={`calendar-view calendar-view--${mode}`} aria-labelledby="calendar-view-title">
       <div className="section-heading">
         <div>
           <p className="eyebrow">预计播出</p>

@@ -4,7 +4,7 @@ BiliAnime Helper is an unofficial Chrome/Edge Manifest V3 extension for Bilibili
 
 ## Current status
 
-M5 is complete. The popup includes a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, sequel-aware scheduling, Chinese title search, manual following, and video rotation. The background service worker now maintains airing reminders and an unseen-episode badge that survives browser restarts.
+M6 is complete. The popup includes a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, sequel-aware scheduling, Chinese title search, manual following, and video rotation. The background service worker maintains airing reminders and an unseen-episode badge that survives browser restarts.
 
 ## Development
 
@@ -36,6 +36,7 @@ To load a production build, open `chrome://extensions`, enable Developer mode, c
 - `services/notifications`: persistent due-event processing, alarm scheduling, notification deduplication, and badge state
 - `features/calendar`: local-time grouping, cached schedule loading, Today, and Next Up UI
 - `features/upcoming`: paginated current-season schedule for all upcoming anime in the next seven days
+- `features/trending`: AniList Top 20, dashboard Top 3 preview, metadata formatting, and cached outage states
 - `domain`, `storage`, `services`, `features`, `components`: reserved boundaries for later milestones
 
 The extension requests only `storage`, `alarms`, and `notifications`, plus AniList and Bangumi API host access. It does not read Bilibili cookies or user account data.

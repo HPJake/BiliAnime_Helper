@@ -99,4 +99,23 @@ describe("AnimeService", () => {
     expect((await service.getUpcomingAnimeSchedule(100, 200, "FALL", 2026)).source).toBe("cache");
     expect(provider.getUpcomingAnimeSchedule).toHaveBeenCalledTimes(1);
   });
+
+  it("uses the 30-minute trending cache and falls back to stale rankings", async () => {
+    let time = 1_000;
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => time);
+    const provider = createProvider();
+    vi.mocked(provider.getTrending).mockResolvedValueOnce([
+      { id: 1, title: { romaji: "Trending" }, synonyms: [] }
+    ]);
+    const service = new AnimeService(provider, cache, () => time);
+
+    expect((await service.getTrending(20)).source).toBe("network");
+    expect((await cache.get("trending:20"))?.expiresAt).toBe(time + CACHE_TTL.trending);
+    expect((await service.getCachedTrending(20))?.data).toHaveLength(1);
+
+    time += CACHE_TTL.trending + 1;
+    vi.mocked(provider.getTrending).mockRejectedValueOnce(new Error("offline"));
+    expect(await service.getTrending(20)).toMatchObject({ source: "cache", stale: true });
+  });
 });

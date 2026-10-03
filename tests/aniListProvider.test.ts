@@ -159,6 +159,26 @@ describe("AniListProvider", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("returns the AniList trending order and filters adult results", async () => {
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      expect(body.query).toContain("sort: TRENDING_DESC");
+      expect(body.query).toContain("isAdult: false");
+      expect(body.variables).toEqual({ perPage: 20 });
+      return Response.json({ data: { Page: { media: [
+        { id: 10, title: { romaji: "First" }, trending: 900, isAdult: false },
+        { id: 20, title: { romaji: "Adult" }, trending: 800, isAdult: true },
+        { id: 30, title: { romaji: "Second" }, trending: 700, isAdult: false }
+      ] } } });
+    });
+    const provider = new AniListProvider(fetcher);
+
+    expect((await provider.getTrending(20)).map((anime) => anime.id)).toEqual([10, 30]);
+  });
+
   it("normalizes GraphQL errors", async () => {
     const provider = new AniListProvider(async () =>
       Response.json({ errors: [{ message: "Invalid query" }] })

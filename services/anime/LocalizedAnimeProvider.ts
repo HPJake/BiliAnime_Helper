@@ -68,8 +68,12 @@ export class LocalizedAnimeProvider implements AnimeProvider {
     };
   }
 
-  getTrending(limit?: number): Promise<Anime[]> {
-    return this.animeProvider.getTrending(limit);
+  async getTrending(limit?: number): Promise<Anime[]> {
+    const [anime, matches] = await Promise.all([
+      this.animeProvider.getTrending(limit),
+      this.safeCalendarTitles()
+    ]);
+    return enrichAndDedupe(anime, matches);
   }
 
   private async safeSearchTitles(query: string, limit: number): Promise<ChineseTitleMatch[]> {

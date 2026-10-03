@@ -64,4 +64,33 @@ describe("LocalizedAnimeProvider", () => {
     expect(schedule.anime[0]?.title.chinese).toBe("青春之箱 第二季");
     expect(schedule.events).toEqual([{ animeId: 189123, episode: 1, airingAt: 100 }]);
   });
+
+  it("enriches trending titles without changing AniList rank order", async () => {
+    const aniList: AnimeProvider = {
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => [
+        { id: 1, title: { native: "薬屋のひとりごと" }, synonyms: [] },
+        { id: 2, title: { native: "葬送のフリーレン" }, synonyms: [] }
+      ])
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => []),
+      getCalendarTitles: vi.fn(async () => [
+        { native: "薬屋のひとりごと", chinese: "药屋少女的呢喃" },
+        { native: "葬送のフリーレン", chinese: "葬送的芙莉莲" }
+      ])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    const trending = await provider.getTrending(20);
+
+    expect(trending.map((anime) => [anime.id, anime.title.chinese])).toEqual([
+      [1, "药屋少女的呢喃"],
+      [2, "葬送的芙莉莲"]
+    ]);
+  });
 });
