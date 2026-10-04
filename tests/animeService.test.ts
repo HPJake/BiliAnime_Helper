@@ -11,7 +11,8 @@ function createProvider(): AnimeProvider {
     getAnimeSeries: vi.fn(async (id: number) => [{ id, title: { romaji: "Fresh" }, synonyms: [] }]),
     getAiringSchedule: vi.fn(async () => []),
     getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
-    getTrending: vi.fn(async () => [])
+    getTrending: vi.fn(async () => []),
+    getRandomAnime: vi.fn(async () => null)
   };
 }
 
@@ -135,5 +136,18 @@ describe("AnimeService", () => {
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
     expect(provider.getTrending).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws random anime from the network without caching the previous result", async () => {
+    const provider = createProvider();
+    vi.mocked(provider.getRandomAnime)
+      .mockResolvedValueOnce({ id: 1, title: { romaji: "First" }, synonyms: [] })
+      .mockResolvedValueOnce({ id: 2, title: { romaji: "Second" }, synonyms: [] });
+    const service = new AnimeService(provider, new CacheRepository(new MemoryStorage()));
+
+    expect((await service.getRandomAnime()).data?.id).toBe(1);
+    expect((await service.getRandomAnime(1)).data?.id).toBe(2);
+    expect(provider.getRandomAnime).toHaveBeenNthCalledWith(1, undefined);
+    expect(provider.getRandomAnime).toHaveBeenNthCalledWith(2, 1);
   });
 });

@@ -6,6 +6,7 @@ import {
   AIRING_SCHEDULE_QUERY,
   ANIME_BY_ID_QUERY,
   ANIME_SERIES_QUERY,
+  RANDOM_ANIME_QUERY,
   SEARCH_ANIME_QUERY,
   SEASON_ANIME_QUERY,
   UPCOMING_AIRING_QUERY,
@@ -25,7 +26,11 @@ type AniListMedia = {
   title?: { romaji?: string | null; english?: string | null; native?: string | null } | null;
   synonyms?: Array<string | null> | null;
   coverImage?: { extraLarge?: string | null; large?: string | null; medium?: string | null } | null;
+  description?: string | null;
   episodes?: number | null;
+  format?: string | null;
+  genres?: Array<string | null> | null;
+  averageScore?: number | null;
   status?: string | null;
   season?: string | null;
   seasonYear?: number | null;
@@ -47,7 +52,9 @@ export class AniListProvider implements AnimeProvider {
   constructor(
     private readonly fetcher: Fetcher = fetch,
     private readonly isOnline: () => boolean = () =>
-      typeof navigator === "undefined" || navigator.onLine
+      typeof navigator === "undefined" || navigator.onLine,
+    private readonly random: () => number = Math.random,
+    private readonly currentYear: () => number = () => new Date().getFullYear()
   ) {}
 
   async searchAnime(query: string, limit = 10): Promise<Anime[]> {
@@ -63,6 +70,24 @@ export class AniListProvider implements AnimeProvider {
   async getAnime(id: number): Promise<Anime | null> {
     const data = await this.request<{ Media?: AniListMedia | null }>(ANIME_BY_ID_QUERY, { id });
     return data.Media ? mapAniListMedia(data.Media) : null;
+  }
+
+  async getRandomAnime(excludeId?: number): Promise<Anime | null> {
+    const firstYear = 1960;
+    const lastYear = this.currentYear() + 1;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const year = firstYear + randomIndex(lastYear - firstYear + 1, this.random);
+      const data = await this.request<{ Page?: { media?: AniListMedia[] | null } | null }>(
+        RANDOM_ANIME_QUERY,
+        { year: `${year}%`, excludedId: excludeId ?? null }
+      );
+      const candidates = mapAnimeList(data.Page?.media);
+      if (candidates.length === 0) continue;
+      const detailed = candidates.filter((anime) => anime.coverImage && anime.description);
+      const pool = detailed.length > 0 ? detailed : candidates;
+      return pool[randomIndex(pool.length, this.random)] ?? null;
+    }
+    return null;
   }
 
   async getAnimeSeries(id: number): Promise<Anime[]> {
@@ -220,6 +245,9 @@ export function mapAniListMedia(media: AniListMedia): Anime | null {
     id: animeId,
     title,
     synonyms: (media.synonyms ?? []).filter((item): item is string => typeof item === "string"),
+    ...(isFiniteNumber(media.averageScore)
+      ? { averageScore: media.averageScore, scoreSource: "AniList" as const }
+      : {}),
     ...(firstString(
       media.coverImage?.extraLarge,
       media.coverImage?.large,
@@ -233,7 +261,14 @@ export function mapAniListMedia(media: AniListMedia): Anime | null {
           )
         }
       : {}),
+    ...(typeof media.description === "string" && cleanDescription(media.description)
+      ? { description: cleanDescription(media.description) }
+      : {}),
     ...(isFiniteNumber(media.episodes) ? { episodes: media.episodes } : {}),
+    ...(typeof media.format === "string" ? { format: media.format } : {}),
+    ...(Array.isArray(media.genres)
+      ? { genres: media.genres.filter((genre): genre is string => typeof genre === "string") }
+      : {}),
     ...(typeof media.status === "string" ? { status: media.status } : {}),
     ...(typeof media.season === "string" ? { season: media.season } : {}),
     ...(isFiniteNumber(media.seasonYear) ? { seasonYear: media.seasonYear } : {}),
@@ -305,6 +340,24 @@ function isFiniteNumber(value: unknown): value is number {
 
 function clampLimit(limit: number): number {
   return Math.min(50, Math.max(1, Math.trunc(limit)));
+}
+
+function randomIndex(length: number, random: () => number): number {
+  if (length <= 1) return 0;
+  const value = Math.min(0.999999999, Math.max(0, random()));
+  return Math.floor(value * length);
+}
+
+function cleanDescription(value: string): string {
+  return value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

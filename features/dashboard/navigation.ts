@@ -1,4 +1,4 @@
-export const DASHBOARD_TABS = ["today", "calendar", "upcoming", "trending", "my-anime", "settings"] as const;
+export const DASHBOARD_TABS = ["today", "calendar", "upcoming", "trending", "my-anime", "random"] as const;
 
 export type DashboardTab = typeof DASHBOARD_TABS[number];
 

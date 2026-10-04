@@ -179,6 +179,49 @@ describe("AniListProvider", () => {
     expect((await provider.getTrending(20)).map((anime) => anime.id)).toEqual([10, 30]);
   });
 
+  it("draws from a random year and prefers candidates with complete details", async () => {
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      expect(body.query).toContain("startDate_like: $year");
+      expect(body.query).toContain("isAdult: false");
+      expect(body.query).toContain("format_in:");
+      expect(body.variables).toEqual({ year: "1960%", excludedId: 7 });
+      return Response.json({ data: { Page: { media: [
+        { id: 1, title: { romaji: "Sparse" }, isAdult: false },
+        {
+          id: 2,
+          title: { romaji: "Detailed" },
+          coverImage: { large: "cover.jpg" },
+          description: "Story",
+          averageScore: 80,
+          isAdult: false
+        },
+        {
+          id: 3,
+          title: { romaji: "Also detailed" },
+          coverImage: { large: "cover-2.jpg" },
+          description: "Story 2",
+          isAdult: false
+        }
+      ] } } });
+    });
+    const randomValues = [0, 0.9];
+    const provider = new AniListProvider(
+      fetcher,
+      () => true,
+      () => randomValues.shift() ?? 0,
+      () => 2026
+    );
+
+    await expect(provider.getRandomAnime(7)).resolves.toMatchObject({
+      id: 3,
+      description: "Story 2"
+    });
+  });
+
   it("normalizes GraphQL errors", async () => {
     const provider = new AniListProvider(async () =>
       Response.json({ errors: [{ message: "Invalid query" }] })

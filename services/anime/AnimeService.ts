@@ -37,6 +37,14 @@ export class AnimeService {
     return this.load(`metadata:v2:${id}`, CACHE_TTL.metadata, () => this.provider.getAnime(id));
   }
 
+  async getRandomAnime(excludeId?: number): Promise<AnimeDataResult<Anime | null>> {
+    return {
+      data: await this.provider.getRandomAnime(excludeId),
+      source: "network",
+      stale: false
+    };
+  }
+
   getCachedAnime(id: number): Promise<AnimeDataResult<Anime | null> | null> {
     return this.peek(`metadata:v2:${id}`);
   }

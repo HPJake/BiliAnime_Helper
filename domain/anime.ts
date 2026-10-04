@@ -11,12 +11,17 @@ export type Anime = {
   id: number;
   title: AnimeTitle;
   synonyms: string[];
+  averageScore?: number;
   coverImage?: string;
+  description?: string;
   episodes?: number;
+  format?: string;
+  genres?: string[];
   status?: string;
   season?: string;
   seasonYear?: number;
   popularity?: number;
+  scoreSource?: "AniList" | "Bangumi";
   trending?: number;
   nextAiringEpisode?: AiringEvent;
 };

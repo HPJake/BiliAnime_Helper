@@ -1,6 +1,8 @@
 export type ChineseTitleMatch = {
   native: string;
   chinese: string;
+  score?: number;
+  summary?: string;
 };
 
 export interface ChineseTitleProvider {
@@ -56,7 +58,18 @@ function mapTitleMatches(items: unknown[]): ChineseTitleMatch[] {
     if (!isRecord(item) || typeof item.name !== "string" || typeof item.name_cn !== "string") continue;
     const native = item.name.trim();
     const chinese = item.name_cn.trim();
-    if (native && chinese) matches.set(normalize(native), { native, chinese });
+    const summary = typeof item.summary === "string" ? item.summary.trim() : "";
+    const rating = isRecord(item.rating) && isFiniteNumber(item.rating.score)
+      ? item.rating.score
+      : null;
+    if (native && chinese) {
+      matches.set(normalize(native), {
+        native,
+        chinese,
+        ...(summary ? { summary } : {}),
+        ...(rating !== null && rating > 0 ? { score: rating } : {})
+      });
+    }
   }
   return [...matches.values()];
 }
@@ -71,4 +84,8 @@ function normalize(value: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }

@@ -6,6 +6,7 @@ import { MyAnimeView } from "../../features/following/MyAnimeView";
 import { UpcomingAnimeView } from "../../features/upcoming/UpcomingAnimeView";
 import { TrendingPreview, TrendingView } from "../../features/trending/TrendingView";
 import { SettingsView } from "../../features/settings/SettingsView";
+import { RandomAnimeView } from "../../features/random/RandomAnimeView";
 import {
   DASHBOARD_TABS,
   getKeyboardTab,
@@ -41,6 +42,7 @@ const settingsService = new SettingsService(
 
 export function App() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("today");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(
     DEFAULT_SETTINGS.themePreference
   );
@@ -83,10 +85,11 @@ export function App() {
 
   function selectTab(tab: DashboardTab) {
     setActiveTab(tab);
+    setSettingsOpen(false);
   }
 
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    const next = getKeyboardTab(activeTab, event.key);
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tab: DashboardTab) {
+    const next = getKeyboardTab(tab, event.key);
     if (!next) return;
     event.preventDefault();
     selectTab(next);
@@ -94,9 +97,7 @@ export function App() {
   }
 
   let panel: ReactNode;
-  if (activeTab === "my-anime") {
-    panel = <MyAnimeView animeService={animeService} repository={repository} />;
-  } else if (activeTab === "settings") {
+  if (settingsOpen) {
     panel = (
       <SettingsView
         onThemePreferenceChange={setThemePreference}
@@ -105,6 +106,10 @@ export function App() {
         version={browser.runtime.getManifest().version}
       />
     );
+  } else if (activeTab === "my-anime") {
+    panel = <MyAnimeView animeService={animeService} repository={repository} />;
+  } else if (activeTab === "random") {
+    panel = <RandomAnimeView animeService={animeService} repository={repository} />;
   } else if (activeTab === "upcoming") {
     panel = <UpcomingAnimeView animeService={animeService} repository={repository} />;
   } else if (activeTab === "trending") {
@@ -137,24 +142,38 @@ export function App() {
           <h1>BiliAnime Helper</h1>
           <p>你的本地追番仪表盘</p>
         </div>
-        <span className="unofficial-chip">UNOFFICIAL</span>
+        <button
+          aria-controls="panel-settings"
+          aria-label={settingsOpen ? "关闭设置" : "打开设置"}
+          aria-pressed={settingsOpen}
+          className="settings-button"
+          id="settings-button"
+          onClick={() => setSettingsOpen((open) => !open)}
+          title="设置"
+          type="button"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 8.25A3.75 3.75 0 1 0 12 15.75 3.75 3.75 0 0 0 12 8.25ZM20 13.2v-2.4l-2.05-.65a6.4 6.4 0 0 0-.56-1.35l.99-1.91-1.7-1.7-1.91.99a6.4 6.4 0 0 0-1.35-.56L12.8 3.6h-2.4l-.65 2.05a6.4 6.4 0 0 0-1.35.56l-1.91-.99-1.7 1.7.99 1.91a6.4 6.4 0 0 0-.56 1.35L3.2 10.8v2.4l2.05.65c.14.47.33.92.56 1.35l-.99 1.91 1.7 1.7 1.91-.99c.43.23.88.42 1.35.56l.65 2.05h2.4l.65-2.05c.47-.14.92-.33 1.35-.56l1.91.99 1.7-1.7-.99-1.91c.23-.43.42-.88.56-1.35L20 13.2Z" />
+          </svg>
+        </button>
       </header>
       <nav className="tab-bar" role="tablist" aria-label="功能导航">
         {DASHBOARD_TABS.map((tab) => (
           <TabButton
-            active={activeTab === tab}
+            active={!settingsOpen && activeTab === tab}
             key={tab}
             label={TAB_LABELS[tab]}
             onClick={() => selectTab(tab)}
-            onKeyDown={handleTabKeyDown}
+            onKeyDown={(event) => handleTabKeyDown(event, tab)}
             tab={tab}
+            tabbable={activeTab === tab}
           />
         ))}
       </nav>
       <section
-        aria-labelledby={`tab-${activeTab}`}
+        aria-labelledby={settingsOpen ? "settings-button" : `tab-${activeTab}`}
         className="tab-panel"
-        id={`panel-${activeTab}`}
+        id={`panel-${settingsOpen ? "settings" : activeTab}`}
         role="tabpanel"
       >
         {panel}
@@ -173,7 +192,7 @@ const TAB_LABELS: Record<DashboardTab, string> = {
   upcoming: "新番",
   trending: "趋势",
   "my-anime": "追番",
-  settings: "设置"
+  random: "随机"
 };
 
 type TabButtonProps = {
@@ -182,9 +201,10 @@ type TabButtonProps = {
   onClick: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   tab: DashboardTab;
+  tabbable: boolean;
 };
 
-function TabButton({ active, label, onClick, onKeyDown, tab }: TabButtonProps) {
+function TabButton({ active, label, onClick, onKeyDown, tab, tabbable }: TabButtonProps) {
   return (
     <button
       aria-controls={`panel-${tab}`}
@@ -193,7 +213,7 @@ function TabButton({ active, label, onClick, onKeyDown, tab }: TabButtonProps) {
       onClick={onClick}
       onKeyDown={onKeyDown}
       role="tab"
-      tabIndex={active ? 0 : -1}
+      tabIndex={tabbable ? 0 : -1}
       type="button"
     >
       {label}

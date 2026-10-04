@@ -3,7 +3,11 @@ const ANIME_FIELDS = `
   title { romaji english native }
   synonyms
   coverImage { extraLarge large medium }
+  description(asHtml: false)
   episodes
+  format
+  genres
+  averageScore
   status
   season
   seasonYear
@@ -11,6 +15,24 @@ const ANIME_FIELDS = `
   trending
   isAdult
   nextAiringEpisode { mediaId episode airingAt }
+`;
+
+export const RANDOM_ANIME_QUERY = `
+  query RandomAnime($year: String!, $excludedId: Int) {
+    Page(page: 1, perPage: 50) {
+      media(
+        type: ANIME
+        isAdult: false
+        id_not: $excludedId
+        startDate_like: $year
+        countryOfOrigin: JP
+        format_in: [TV, TV_SHORT, MOVIE, OVA, ONA, SPECIAL]
+        sort: [POPULARITY_DESC, SCORE_DESC]
+      ) {
+        ${ANIME_FIELDS}
+      }
+    }
+  }
 `;
 
 export const SEARCH_ANIME_QUERY = `

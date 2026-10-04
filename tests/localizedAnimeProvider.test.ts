@@ -20,7 +20,8 @@ describe("LocalizedAnimeProvider", () => {
       getAnimeSeries: vi.fn(async () => []),
       getAiringSchedule: vi.fn(async () => []),
       getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
-      getTrending: vi.fn(async () => [])
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
     };
     const chineseTitles: ChineseTitleProvider = {
       searchTitles: vi.fn(async () => [
@@ -58,7 +59,8 @@ describe("LocalizedAnimeProvider", () => {
           { animeId: 200000, episode: 2, airingAt: 150 }
         ]
       })),
-      getTrending: vi.fn(async () => [])
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
     };
     const chineseTitles: ChineseTitleProvider = {
       searchTitles: vi.fn(async (query: string) => query === "ダンダダン"
@@ -92,7 +94,8 @@ describe("LocalizedAnimeProvider", () => {
         { id: 1, title: { native: "薬屋のひとりごと" }, synonyms: [] },
         { id: 2, title: { native: "葬送のフリーレン" }, synonyms: [] },
         { id: 3, title: { native: "ダンダダン" }, synonyms: [] }
-      ])
+      ]),
+      getRandomAnime: vi.fn(async () => null)
     };
     const chineseTitles: ChineseTitleProvider = {
       searchTitles: vi.fn(async (query: string) => query === "ダンダダン"
@@ -126,5 +129,134 @@ describe("LocalizedAnimeProvider", () => {
     ]);
 
     expect(sorted.map((anime) => anime.id)).toEqual([3, 4, 2, 1, 5]);
+  });
+
+  it("enriches a random anime with Chinese details and forwards the excluded id", async () => {
+    const aniList: AnimeProvider = {
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => ({
+        id: 154587,
+        title: { native: "葬送のフリーレン" },
+        synonyms: [],
+        description: "AniList description",
+        averageScore: 91,
+        scoreSource: "AniList" as const
+      }))
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => [{
+        native: "葬送のフリーレン",
+        chinese: "葬送的芙莉莲",
+        summary: "勇者一行击败魔王之后的故事。",
+        score: 8.9
+      }]),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    await expect(provider.getRandomAnime(7)).resolves.toMatchObject({
+      id: 154587,
+      title: { chinese: "葬送的芙莉莲" },
+      description: "勇者一行击败魔王之后的故事。",
+      averageScore: 89,
+      scoreSource: "Bangumi"
+    });
+    expect(aniList.getRandomAnime).toHaveBeenCalledWith(7);
+  });
+
+  it("keeps a relevant Bangumi match when punctuation and season notation differ", async () => {
+    const aniList: AnimeProvider = {
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => ({
+        id: 104578,
+        title: {
+          native: "進撃の巨人 Season 3 Part.2",
+          romaji: "Shingeki no Kyojin Season 3 Part 2"
+        },
+        synonyms: ["Attack on Titan Season 3 Part 2"],
+        description: "The battle for Shiganshina begins."
+      }))
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => [{
+        native: "進撃の巨人 Season 3 Part 2",
+        chinese: "进击的巨人 第三季 Part.2",
+        summary: "调查兵团为夺回玛利亚之墙再次出征。"
+      }]),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    await expect(provider.getRandomAnime()).resolves.toMatchObject({
+      title: { chinese: "进击的巨人 第三季 Part.2" },
+      description: "调查兵团为夺回玛利亚之墙再次出征。"
+    });
+  });
+
+  it("does not present an AniList foreign-language description as a Chinese summary", async () => {
+    const aniList: AnimeProvider = {
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => ({
+        id: 1,
+        title: { native: "作品名" },
+        synonyms: [],
+        description: "An English synopsis from AniList."
+      }))
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => []),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+
+    const anime = await new LocalizedAnimeProvider(aniList, chineseTitles).getRandomAnime();
+
+    expect(anime?.description).toBeUndefined();
+  });
+
+  it("falls back to alternate titles when the native title has no Bangumi result", async () => {
+    const aniList: AnimeProvider = {
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => ({
+        id: 2,
+        title: { native: "検索できない原題", romaji: "Searchable Alternate Title" },
+        synonyms: ["Another Alias"],
+        description: "Foreign synopsis"
+      }))
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async (query: string) => query === "Searchable Alternate Title"
+        ? [{ native: "別表記", chinese: "可搜索的中文标题", summary: "中文剧情简介。" }]
+        : []),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+
+    const anime = await new LocalizedAnimeProvider(aniList, chineseTitles).getRandomAnime();
+
+    expect(anime).toMatchObject({
+      title: { chinese: "可搜索的中文标题" },
+      description: "中文剧情简介。"
+    });
+    expect(chineseTitles.searchTitles).toHaveBeenNthCalledWith(1, "検索できない原題", 5);
+    expect(chineseTitles.searchTitles).toHaveBeenNthCalledWith(2, "Searchable Alternate Title", 5);
   });
 });

@@ -35,9 +35,16 @@ export class LocalizedAnimeProvider implements AnimeProvider {
   async getAnime(id: number): Promise<Anime | null> {
     const anime = await this.animeProvider.getAnime(id);
     if (!anime) return null;
-    const query = anime.title.native || anime.title.romaji || anime.title.english;
-    if (!query) return anime;
-    return enrichAnime(anime, await this.safeSearchTitles(query, 10));
+    const match = await this.lookupChineseTitleForAnime(anime);
+    return match ? applyChineseMatch(anime, match) : anime;
+  }
+
+  async getRandomAnime(excludeId?: number): Promise<Anime | null> {
+    const anime = await this.animeProvider.getRandomAnime(excludeId);
+    if (!anime) return null;
+    const match = await this.lookupChineseTitleForAnime(anime);
+    const localized = removeDescription(anime);
+    return match ? applyChineseMatch(localized, match) : localized;
   }
 
   async getAnimeSeries(id: number): Promise<Anime[]> {
@@ -91,21 +98,37 @@ export class LocalizedAnimeProvider implements AnimeProvider {
       missing,
       TITLE_LOOKUP_CONCURRENCY,
       async (item) => {
-        const query = item.title.native || item.title.romaji || item.title.english;
-        if (!query) return null;
-        const match = await this.lookupChineseTitle(query);
-        return match ? { animeId: item.id, chinese: match.chinese } : null;
+        const match = await this.lookupChineseTitleForAnime(item);
+        return match ? { animeId: item.id, match } : null;
       }
     );
-    const chineseByAnimeId = new Map(
+    const matchByAnimeId = new Map(
       resolved
-        .filter((item): item is { animeId: number; chinese: string } => item !== null)
-        .map((item) => [item.animeId, item.chinese])
+        .filter((item): item is { animeId: number; match: ChineseTitleMatch } => item !== null)
+        .map((item) => [item.animeId, item.match])
     );
     return localized.map((item) => {
-      const chinese = chineseByAnimeId.get(item.id);
-      return chinese ? { ...item, title: { ...item.title, chinese } } : item;
+      const match = matchByAnimeId.get(item.id);
+      return match ? applyChineseMatch(item, match) : item;
     });
+  }
+
+  private async lookupChineseTitleForAnime(anime: Anime): Promise<ChineseTitleMatch | null> {
+    const queries = [
+      anime.title.native,
+      anime.title.romaji,
+      anime.title.english,
+      ...anime.synonyms
+    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+    const seen = new Set<string>();
+    for (const query of queries) {
+      const key = normalize(query);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const match = await this.lookupChineseTitle(query);
+      if (match) return match;
+    }
+    return null;
   }
 
   private lookupChineseTitle(query: string): Promise<ChineseTitleMatch | null> {
@@ -147,7 +170,24 @@ function enrichAndDedupe(anime: Anime[], matches: ChineseTitleMatch[]): Anime[] 
 function enrichAnime(anime: Anime, matches: ChineseTitleMatch[]): Anime {
   const native = anime.title.native && normalize(anime.title.native);
   const match = native ? matches.find((candidate) => normalize(candidate.native) === native) : undefined;
-  return match ? { ...anime, title: { ...anime.title, chinese: match.chinese } } : anime;
+  return match ? applyChineseMatch(anime, match) : anime;
+}
+
+function applyChineseMatch(anime: Anime, match: ChineseTitleMatch): Anime {
+  return {
+    ...anime,
+    title: { ...anime.title, chinese: match.chinese },
+    ...(match.summary ? { description: match.summary } : {}),
+    ...(match.score !== undefined
+      ? { averageScore: match.score * 10, scoreSource: "Bangumi" as const }
+      : {})
+  };
+}
+
+function removeDescription(anime: Anime): Anime {
+  const result = { ...anime };
+  delete result.description;
+  return result;
 }
 
 export function sortAnimeByNewestSeason(anime: Anime[]): Anime[] {
@@ -191,5 +231,8 @@ async function mapWithConcurrency<T, R>(
 }
 
 function normalize(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase();
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu, "");
 }

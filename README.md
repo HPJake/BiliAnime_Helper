@@ -4,7 +4,7 @@ BiliAnime Helper is an unofficial Chrome/Edge Manifest V3 extension for Bilibili
 
 ## Current status
 
-M8 is complete. The popup is a responsive, keyboard-accessible anime dashboard with Bilibili-aware light/dark appearance controls, local notification and badge settings, manual data refresh and cache cleanup, a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, one-click follow actions in upcoming and trending cards, sequel-aware scheduling, Chinese title search, manual following, and video rotation. Reliability coverage includes API outages, corrupted storage, missing fields, service-worker restarts, duplicate events, concurrent cache requests, and local write races.
+M8 is complete. The popup is a responsive, keyboard-accessible anime dashboard with Bilibili-aware light/dark appearance controls, a top-right settings panel, local notification and badge settings, manual data refresh and cache cleanup, a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, a Chinese-enriched random-anime picker, one-click follow actions in upcoming, trending, and random result cards, sequel-aware scheduling, Chinese title search, manual following, and video rotation. Reliability coverage includes API outages, corrupted storage, missing fields, service-worker restarts, duplicate events, concurrent cache requests, and local write races.
 
 ## Development
 
@@ -37,6 +37,7 @@ To load a production build, open `chrome://extensions`, enable Developer mode, c
 - `features/calendar`: local-time grouping, cached schedule loading, Today, and Next Up UI
 - `features/upcoming`: paginated current-season schedule for all upcoming anime in the next seven days
 - `features/trending`: AniList Top 20, dashboard Top 3 preview, metadata formatting, and cached outage states
+- `features/random`: random anime discovery, Chinese metadata presentation, score/fact formatting, and follow actions
 - `features/dashboard`: popup navigation model and keyboard tab behavior
 - `features/settings` and `services/settings`: local preferences, refresh, cache cleanup, and background synchronization
 - `features/theme` and `services/theme`: Bilibili theme inference, system fallback, and active-tab theme resolution

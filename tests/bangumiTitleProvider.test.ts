@@ -9,7 +9,13 @@ describe("BangumiTitleProvider", () => {
       void _init;
       return Promise.resolve(Response.json({
         data: [
-          { name: "薬屋のひとりごと", name_cn: "药屋少女的呢喃", type: 2 },
+          {
+            name: "薬屋のひとりごと",
+            name_cn: "药屋少女的呢喃",
+            summary: "宫廷中的推理故事。",
+            rating: { score: 8.2 },
+            type: 2
+          },
           { name: "薬屋のひとりごと 第3期", name_cn: "药屋少女的呢喃 第三季", type: 2 }
         ]
       }));
@@ -17,7 +23,12 @@ describe("BangumiTitleProvider", () => {
     const provider = new BangumiTitleProvider(fetcher);
 
     await expect(provider.searchTitles("药屋少女的呢喃", 10)).resolves.toEqual([
-      { native: "薬屋のひとりごと", chinese: "药屋少女的呢喃" },
+      {
+        native: "薬屋のひとりごと",
+        chinese: "药屋少女的呢喃",
+        summary: "宫廷中的推理故事。",
+        score: 8.2
+      },
       { native: "薬屋のひとりごと 第3期", chinese: "药屋少女的呢喃 第三季" }
     ]);
     const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
