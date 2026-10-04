@@ -1,5 +1,6 @@
 import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime } from "../../domain/anime";
+import type { DiscoveryFilters, DiscoveryPage } from "../../domain/discovery";
 import type { AnimeProvider } from "./AnimeProvider";
 import type { ChineseTitleMatch, ChineseTitleProvider } from "./BangumiTitleProvider";
 
@@ -39,8 +40,20 @@ export class LocalizedAnimeProvider implements AnimeProvider {
     return match ? applyChineseMatch(anime, match) : anime;
   }
 
-  async getRandomAnime(excludeId?: number): Promise<Anime | null> {
-    const anime = await this.animeProvider.getRandomAnime(excludeId);
+  async browseAnime(
+    filters: DiscoveryFilters,
+    page: number,
+    perPage?: number
+  ): Promise<DiscoveryPage> {
+    const result = await this.animeProvider.browseAnime(filters, page, perPage);
+    return {
+      ...result,
+      anime: await this.enrichMissingChineseTitles(result.anime, [])
+    };
+  }
+
+  async getRandomAnime(excludeId?: number, filters?: DiscoveryFilters): Promise<Anime | null> {
+    const anime = await this.animeProvider.getRandomAnime(excludeId, filters);
     if (!anime) return null;
     const match = await this.lookupChineseTitleForAnime(anime);
     const localized = removeDescription(anime);

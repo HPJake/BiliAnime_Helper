@@ -1,11 +1,19 @@
 import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime, AnimeTitle } from "../../domain/anime";
+import {
+  DEFAULT_DISCOVERY_FILTERS,
+  getDiscoveryYearRange,
+  type DiscoveryFilters,
+  type DiscoveryPage,
+  type DiscoverySort
+} from "../../domain/discovery";
 import type { AnimeProvider } from "./AnimeProvider";
 import { AnimeApiError, normalizeApiError, parseRetryAfter } from "./errors";
 import {
   AIRING_SCHEDULE_QUERY,
   ANIME_BY_ID_QUERY,
   ANIME_SERIES_QUERY,
+  DISCOVER_ANIME_QUERY,
   RANDOM_ANIME_QUERY,
   SEARCH_ANIME_QUERY,
   SEASON_ANIME_QUERY,
@@ -14,6 +22,7 @@ import {
 } from "./queries";
 
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
+const DISCOVERY_FORMATS = ["TV", "TV_SHORT", "ONA", "OVA", "MOVIE"] as const;
 
 type AniListAiring = {
   mediaId?: number | null;
@@ -72,14 +81,50 @@ export class AniListProvider implements AnimeProvider {
     return data.Media ? mapAniListMedia(data.Media) : null;
   }
 
-  async getRandomAnime(excludeId?: number): Promise<Anime | null> {
-    const firstYear = 1960;
-    const lastYear = this.currentYear() + 1;
+  async browseAnime(
+    filters: DiscoveryFilters,
+    page: number,
+    perPage = 10
+  ): Promise<DiscoveryPage> {
+    const range = getDiscoveryYearRange(filters.era, this.currentYear());
+    const data = await this.request<{
+      Page?: {
+        pageInfo?: { hasNextPage?: boolean | null; total?: number | null } | null;
+        media?: AniListMedia[] | null;
+      } | null;
+    }>(DISCOVER_ANIME_QUERY, {
+      page: Math.max(1, Math.trunc(page)),
+      perPage: clampLimit(perPage),
+      formats: filters.format === "ALL" ? DISCOVERY_FORMATS : [filters.format],
+      genres: filters.genres.length > 0 ? filters.genres : null,
+      startDate: range.from * 10_000,
+      endDate: range.to * 10_000 + 1231,
+      sort: mapDiscoverySort(filters.sort)
+    });
+    return {
+      anime: mapAnimeList(data.Page?.media),
+      hasNextPage: data.Page?.pageInfo?.hasNextPage === true,
+      page: Math.max(1, Math.trunc(page)),
+      total: isFiniteNumber(data.Page?.pageInfo?.total) ? data.Page.pageInfo.total : 0
+    };
+  }
+
+  async getRandomAnime(excludeId?: number, filters?: DiscoveryFilters): Promise<Anime | null> {
+    const range = getDiscoveryYearRange(filters?.era ?? "ALL", this.currentYear());
+    const firstYear = range.from;
+    const lastYear = range.to;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const year = firstYear + randomIndex(lastYear - firstYear + 1, this.random);
       const data = await this.request<{ Page?: { media?: AniListMedia[] | null } | null }>(
         RANDOM_ANIME_QUERY,
-        { year: `${year}%`, excludedId: excludeId ?? null }
+        {
+          year: `${year}%`,
+          excludedId: excludeId ?? null,
+          formats: filters && filters.format !== "ALL"
+            ? [filters.format]
+            : DISCOVERY_FORMATS,
+          genres: filters && filters.genres.length > 0 ? filters.genres : null
+        }
       );
       const candidates = mapAnimeList(data.Page?.media);
       if (candidates.length === 0) continue;
@@ -87,7 +132,9 @@ export class AniListProvider implements AnimeProvider {
       const pool = detailed.length > 0 ? detailed : candidates;
       return pool[randomIndex(pool.length, this.random)] ?? null;
     }
-    return null;
+    const fallback = await this.browseAnime(filters ?? DEFAULT_DISCOVERY_FILTERS, 1, 50);
+    const candidates = fallback.anime.filter((anime) => anime.id !== excludeId);
+    return candidates[randomIndex(candidates.length, this.random)] ?? null;
   }
 
   async getAnimeSeries(id: number): Promise<Anime[]> {
@@ -340,6 +387,13 @@ function isFiniteNumber(value: unknown): value is number {
 
 function clampLimit(limit: number): number {
   return Math.min(50, Math.max(1, Math.trunc(limit)));
+}
+
+function mapDiscoverySort(sort: DiscoverySort): string[] {
+  if (sort === "SCORE") return ["SCORE_DESC", "POPULARITY_DESC"];
+  if (sort === "NEWEST") return ["START_DATE_DESC", "POPULARITY_DESC"];
+  if (sort === "TRENDING") return ["TRENDING_DESC", "POPULARITY_DESC"];
+  return ["POPULARITY_DESC", "SCORE_DESC"];
 }
 
 function randomIndex(length: number, random: () => number): number {

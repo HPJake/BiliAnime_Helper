@@ -188,7 +188,12 @@ describe("AniListProvider", () => {
       expect(body.query).toContain("startDate_like: $year");
       expect(body.query).toContain("isAdult: false");
       expect(body.query).toContain("format_in:");
-      expect(body.variables).toEqual({ year: "1960%", excludedId: 7 });
+      expect(body.variables).toEqual({
+        year: "1960%",
+        excludedId: 7,
+        formats: ["TV", "TV_SHORT", "ONA", "OVA", "MOVIE"],
+        genres: null
+      });
       return Response.json({ data: { Page: { media: [
         { id: 1, title: { romaji: "Sparse" }, isAdult: false },
         {
@@ -220,6 +225,65 @@ describe("AniListProvider", () => {
       id: 3,
       description: "Story 2"
     });
+  });
+
+  it("browses anime with category filters and maps pagination", async () => {
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      expect(body.query).toContain("genre_in: $genres");
+      expect(body.query).toContain("format_in: $formats");
+      expect(body.variables).toEqual({
+        page: 2,
+        perPage: 10,
+        formats: ["MOVIE"],
+        genres: ["Sci-Fi", "Mystery"],
+        startDate: 20100000,
+        endDate: 20191231,
+        sort: ["SCORE_DESC", "POPULARITY_DESC"]
+      });
+      return Response.json({ data: { Page: {
+        pageInfo: { hasNextPage: true, total: 42 },
+        media: [{ id: 1, title: { native: "作品" }, isAdult: false }]
+      } } });
+    });
+    const provider = new AniListProvider(fetcher);
+
+    await expect(provider.browseAnime({
+      era: "2010S",
+      format: "MOVIE",
+      genres: ["Sci-Fi", "Mystery"],
+      sort: "SCORE"
+    }, 2)).resolves.toMatchObject({
+      anime: [{ id: 1 }],
+      hasNextPage: true,
+      page: 2,
+      total: 42
+    });
+  });
+
+  it("falls back to the first filtered category page when sparse years are empty", async () => {
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { query: string };
+      if (body.query.includes("RandomAnime")) {
+        return Response.json({ data: { Page: { media: [] } } });
+      }
+      return Response.json({ data: { Page: {
+        pageInfo: { hasNextPage: false, total: 1 },
+        media: [{ id: 9, title: { native: "稀有作品" }, isAdult: false }]
+      } } });
+    });
+    const provider = new AniListProvider(fetcher, () => true, () => 0, () => 2026);
+
+    await expect(provider.getRandomAnime(undefined, {
+      era: "CLASSIC",
+      format: "MOVIE",
+      genres: ["Horror", "Mecha"],
+      sort: "POPULARITY"
+    })).resolves.toMatchObject({ id: 9 });
+    expect(fetcher).toHaveBeenCalledTimes(5);
   });
 
   it("normalizes GraphQL errors", async () => {

@@ -1,5 +1,10 @@
 import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime } from "../../domain/anime";
+import {
+  serializeDiscoveryFilters,
+  type DiscoveryFilters,
+  type DiscoveryPage
+} from "../../domain/discovery";
 import { CacheRepository, isCacheFresh } from "../../utils/cache";
 import type { AnimeProvider } from "./AnimeProvider";
 
@@ -7,7 +12,8 @@ export const CACHE_TTL = {
   metadata: 6 * 60 * 60 * 1000,
   airing: 30 * 60 * 1000,
   trending: 30 * 60 * 1000,
-  search: 5 * 60 * 1000
+  search: 5 * 60 * 1000,
+  discovery: 30 * 60 * 1000
 } as const;
 
 export type AnimeDataResult<T> = {
@@ -37,9 +43,23 @@ export class AnimeService {
     return this.load(`metadata:v2:${id}`, CACHE_TTL.metadata, () => this.provider.getAnime(id));
   }
 
-  async getRandomAnime(excludeId?: number): Promise<AnimeDataResult<Anime | null>> {
+  browseAnime(
+    filters: DiscoveryFilters,
+    page: number,
+    perPage = 10
+  ): Promise<AnimeDataResult<DiscoveryPage>> {
+    const key = `discovery:v1:${serializeDiscoveryFilters(filters)}:${page}:${perPage}`;
+    return this.load(key, CACHE_TTL.discovery, () =>
+      this.provider.browseAnime(filters, page, perPage)
+    );
+  }
+
+  async getRandomAnime(
+    excludeId?: number,
+    filters?: DiscoveryFilters
+  ): Promise<AnimeDataResult<Anime | null>> {
     return {
-      data: await this.provider.getRandomAnime(excludeId),
+      data: await this.provider.getRandomAnime(excludeId, filters),
       source: "network",
       stale: false
     };

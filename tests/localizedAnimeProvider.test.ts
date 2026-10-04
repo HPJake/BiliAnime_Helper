@@ -9,6 +9,7 @@ import {
 describe("LocalizedAnimeProvider", () => {
   it("expands a Chinese query through Bangumi and enriches every matching season", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async (query: string) => query === "薬屋のひとりごと"
         ? [
             { id: 161645, title: { native: "薬屋のひとりごと" }, synonyms: [] },
@@ -45,6 +46,7 @@ describe("LocalizedAnimeProvider", () => {
 
   it("enriches the global weekly schedule from the Bangumi calendar", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async () => []),
       getAnime: vi.fn(async () => null),
       getAnimeSeries: vi.fn(async () => []),
@@ -85,6 +87,7 @@ describe("LocalizedAnimeProvider", () => {
 
   it("enriches trending titles without changing AniList rank order", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async () => []),
       getAnime: vi.fn(async () => null),
       getAnimeSeries: vi.fn(async () => []),
@@ -133,6 +136,7 @@ describe("LocalizedAnimeProvider", () => {
 
   it("enriches a random anime with Chinese details and forwards the excluded id", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async () => []),
       getAnime: vi.fn(async () => null),
       getAnimeSeries: vi.fn(async () => []),
@@ -166,11 +170,44 @@ describe("LocalizedAnimeProvider", () => {
       averageScore: 89,
       scoreSource: "Bangumi"
     });
-    expect(aniList.getRandomAnime).toHaveBeenCalledWith(7);
+    expect(aniList.getRandomAnime).toHaveBeenCalledWith(7, undefined);
+  });
+
+  it("enriches category results without changing pagination", async () => {
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({
+        anime: [{ id: 10, title: { native: "ダンダダン" }, synonyms: [] }],
+        hasNextPage: true,
+        page,
+        total: 25
+      })),
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => [{ native: "ダンダダン", chinese: "胆大党" }]),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    await expect(provider.browseAnime({
+      era: "ALL", format: "ALL", genres: [], sort: "POPULARITY"
+    }, 2, 10)).resolves.toMatchObject({
+      anime: [{ id: 10, title: { chinese: "胆大党" } }],
+      hasNextPage: true,
+      page: 2,
+      total: 25
+    });
   });
 
   it("keeps a relevant Bangumi match when punctuation and season notation differ", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async () => []),
       getAnime: vi.fn(async () => null),
       getAnimeSeries: vi.fn(async () => []),
@@ -205,6 +242,7 @@ describe("LocalizedAnimeProvider", () => {
 
   it("does not present an AniList foreign-language description as a Chinese summary", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async () => []),
       getAnime: vi.fn(async () => null),
       getAnimeSeries: vi.fn(async () => []),
@@ -230,6 +268,7 @@ describe("LocalizedAnimeProvider", () => {
 
   it("falls back to alternate titles when the native title has no Bangumi result", async () => {
     const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
       searchAnime: vi.fn(async () => []),
       getAnime: vi.fn(async () => null),
       getAnimeSeries: vi.fn(async () => []),

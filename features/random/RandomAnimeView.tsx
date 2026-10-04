@@ -1,29 +1,33 @@
 import { useState } from "react";
 import { StateMessage } from "../../components/StateMessage";
 import { getChineseAnimeDisplayTitle, type Anime } from "../../domain/anime";
+import type { DiscoveryFilters } from "../../domain/discovery";
 import type { AnimeService } from "../../services/anime/AnimeService";
 import { AnimeApiError } from "../../services/anime/errors";
 import { openBilibiliSearch } from "../../services/bilibili/openBilibiliSearch";
-import type { AppRepository } from "../../storage/repository";
 import { FollowAnimeButton } from "../following/FollowAnimeButton";
-import { useFollowActions } from "../following/useFollowActions";
+import type { FollowActions } from "../following/useFollowActions";
 import {
   formatRandomAnimeGenres,
   formatRandomAnimeScore,
   getRandomAnimeFacts
 } from "./randomAnime";
 
-type RandomAnimeViewProps = {
+type RandomAnimePanelProps = {
   animeService: AnimeService;
-  repository: AppRepository;
+  filters: DiscoveryFilters;
+  followActions: FollowActions;
 };
 
-export function RandomAnimeView({ animeService, repository }: RandomAnimeViewProps) {
+export function RandomAnimePanel({
+  animeService,
+  filters,
+  followActions
+}: RandomAnimePanelProps) {
   const [anime, setAnime] = useState<Anime | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
-  const followActions = useFollowActions(repository);
 
   async function drawAnime() {
     if (loading) return;
@@ -31,7 +35,7 @@ export function RandomAnimeView({ animeService, repository }: RandomAnimeViewPro
     setError(null);
     setHasDrawn(true);
     try {
-      const result = await animeService.getRandomAnime(anime?.id);
+      const result = await animeService.getRandomAnime(anime?.id, filters);
       if (!result.data) {
         setAnime(null);
         setError("这次没有抽到合适的番剧，请再试一次。");
@@ -46,11 +50,11 @@ export function RandomAnimeView({ animeService, repository }: RandomAnimeViewPro
   }
 
   return (
-    <section className="random-view" aria-labelledby="random-title">
+    <section className="random-panel" aria-labelledby="random-title">
       <div className="section-heading">
         <div>
           <p className="eyebrow">ANIME ROULETTE</p>
-          <h2 id="random-title">随机一番</h2>
+          <h3 id="random-title">随心一番</h3>
         </div>
         {anime ? (
           <button className="secondary-button" disabled={loading} onClick={() => void drawAnime()} type="button">
@@ -58,7 +62,7 @@ export function RandomAnimeView({ animeService, repository }: RandomAnimeViewPro
           </button>
         ) : null}
       </div>
-      <p className="schedule-note">从 1960 年至今的日本动画中随机发现一部作品。</p>
+      <p className="schedule-note">从当前筛选范围随机抽取；不设条件时新番、老番都有机会出现。</p>
 
       {error ? <StateMessage detail={error} title="随机抽取失败" tone="error" /> : null}
       {followActions.error ? <StateMessage detail={followActions.error} title="无法更新追番状态" tone="warning" /> : null}
@@ -67,9 +71,9 @@ export function RandomAnimeView({ animeService, repository }: RandomAnimeViewPro
         <div className="random-empty">
           <span aria-hidden="true">?</span>
           <strong>{loading ? "正在翻动番剧库…" : "今天看什么？"}</strong>
-          <p>{hasDrawn && error ? "网络恢复后可以继续抽取。" : "新番、老番都有机会出现。"}</p>
+          <p>{hasDrawn && error ? "网络恢复后可以继续抽取。" : "会自动采用当前的分类筛选条件。"}</p>
           <button className="primary-button" disabled={loading} onClick={() => void drawAnime()} type="button">
-            {loading ? "抽取中…" : "抽一部"}
+            {loading ? "抽取中…" : "按当前条件抽一部"}
           </button>
         </div>
       ) : (
@@ -84,7 +88,7 @@ function RandomAnimeCard({
   followActions
 }: {
   anime: Anime;
-  followActions: ReturnType<typeof useFollowActions>;
+  followActions: FollowActions;
 }) {
   const title = getChineseAnimeDisplayTitle(anime);
   const originalTitle = anime.title.native || anime.title.romaji || anime.title.english;

@@ -6,7 +6,7 @@ import { MyAnimeView } from "../../features/following/MyAnimeView";
 import { UpcomingAnimeView } from "../../features/upcoming/UpcomingAnimeView";
 import { TrendingPreview, TrendingView } from "../../features/trending/TrendingView";
 import { SettingsView } from "../../features/settings/SettingsView";
-import { RandomAnimeView } from "../../features/random/RandomAnimeView";
+import { DiscoveryView } from "../../features/discovery/DiscoveryView";
 import {
   DASHBOARD_TABS,
   getKeyboardTab,
@@ -108,8 +108,8 @@ export function App() {
     );
   } else if (activeTab === "my-anime") {
     panel = <MyAnimeView animeService={animeService} repository={repository} />;
-  } else if (activeTab === "random") {
-    panel = <RandomAnimeView animeService={animeService} repository={repository} />;
+  } else if (activeTab === "discover") {
+    panel = <DiscoveryView animeService={animeService} repository={repository} />;
   } else if (activeTab === "upcoming") {
     panel = <UpcomingAnimeView animeService={animeService} repository={repository} />;
   } else if (activeTab === "trending") {
@@ -192,7 +192,7 @@ const TAB_LABELS: Record<DashboardTab, string> = {
   upcoming: "新番",
   trending: "趋势",
   "my-anime": "追番",
-  random: "随机"
+  discover: "发现"
 };
 
 type TabButtonProps = {

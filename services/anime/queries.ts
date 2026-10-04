@@ -18,7 +18,12 @@ const ANIME_FIELDS = `
 `;
 
 export const RANDOM_ANIME_QUERY = `
-  query RandomAnime($year: String!, $excludedId: Int) {
+  query RandomAnime(
+    $year: String!
+    $excludedId: Int
+    $formats: [MediaFormat]
+    $genres: [String]
+  ) {
     Page(page: 1, perPage: 50) {
       media(
         type: ANIME
@@ -26,8 +31,37 @@ export const RANDOM_ANIME_QUERY = `
         id_not: $excludedId
         startDate_like: $year
         countryOfOrigin: JP
-        format_in: [TV, TV_SHORT, MOVIE, OVA, ONA, SPECIAL]
+        format_in: $formats
+        genre_in: $genres
         sort: [POPULARITY_DESC, SCORE_DESC]
+      ) {
+        ${ANIME_FIELDS}
+      }
+    }
+  }
+`;
+
+export const DISCOVER_ANIME_QUERY = `
+  query DiscoverAnime(
+    $page: Int!
+    $perPage: Int!
+    $formats: [MediaFormat]
+    $genres: [String]
+    $startDate: FuzzyDateInt
+    $endDate: FuzzyDateInt
+    $sort: [MediaSort!]
+  ) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { hasNextPage total }
+      media(
+        type: ANIME
+        isAdult: false
+        countryOfOrigin: JP
+        format_in: $formats
+        genre_in: $genres
+        startDate_greater: $startDate
+        startDate_lesser: $endDate
+        sort: $sort
       ) {
         ${ANIME_FIELDS}
       }

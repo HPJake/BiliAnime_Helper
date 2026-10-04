@@ -6,6 +6,9 @@ import { MemoryStorage } from "./helpers/memoryStorage";
 
 function createProvider(): AnimeProvider {
   return {
+    browseAnime: vi.fn(async (_filters, page: number) => ({
+      anime: [], hasNextPage: false, page, total: 0
+    })),
     searchAnime: vi.fn(async () => []),
     getAnime: vi.fn(async (id: number) => ({ id, title: { romaji: "Fresh" }, synonyms: [] })),
     getAnimeSeries: vi.fn(async (id: number) => [{ id, title: { romaji: "Fresh" }, synonyms: [] }]),
@@ -147,7 +150,29 @@ describe("AnimeService", () => {
 
     expect((await service.getRandomAnime()).data?.id).toBe(1);
     expect((await service.getRandomAnime(1)).data?.id).toBe(2);
-    expect(provider.getRandomAnime).toHaveBeenNthCalledWith(1, undefined);
-    expect(provider.getRandomAnime).toHaveBeenNthCalledWith(2, 1);
+    expect(provider.getRandomAnime).toHaveBeenNthCalledWith(1, undefined, undefined);
+    expect(provider.getRandomAnime).toHaveBeenNthCalledWith(2, 1, undefined);
+  });
+
+  it("caches category pages by normalized filter values", async () => {
+    const provider = createProvider();
+    vi.mocked(provider.browseAnime).mockResolvedValueOnce({
+      anime: [{ id: 1, title: { native: "作品" }, synonyms: [] }],
+      hasNextPage: false,
+      page: 1,
+      total: 1
+    });
+    const service = new AnimeService(provider, new CacheRepository(new MemoryStorage()));
+    const filters = {
+      era: "2020S" as const,
+      format: "TV" as const,
+      genres: ["Fantasy", "Adventure"],
+      sort: "POPULARITY" as const
+    };
+
+    expect((await service.browseAnime(filters, 1)).source).toBe("network");
+    expect((await service.browseAnime({ ...filters, genres: ["Adventure", "Fantasy"] }, 1)).source)
+      .toBe("cache");
+    expect(provider.browseAnime).toHaveBeenCalledTimes(1);
   });
 });
