@@ -141,22 +141,66 @@ describe("AniListProvider", () => {
     });
   });
 
-  it("normalizes rate limits without retrying", async () => {
+  it("reports a rate limit only after one automatic retry also receives 429", async () => {
     const fetcher = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
       void _input;
       void _init;
-      return new Response("rate limited", {
-        status: 429,
-        headers: { "Retry-After": "45" }
-      });
+      return new Response("rate limited", { status: 429, headers: { "Retry-After": "0" } });
     });
     const provider = new AniListProvider(fetcher);
 
     await expect(provider.getTrending()).rejects.toMatchObject({
       code: "rate_limited",
-      options: { status: 429, retryAfterSeconds: 45 }
+      options: { status: 429, retryAfterSeconds: 0 }
     } satisfies Partial<AnimeApiError>);
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a rate-limited category request when AniList allows an immediate retry", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response("rate limited", {
+        status: 429,
+        headers: { "Retry-After": "0" }
+      }))
+      .mockResolvedValueOnce(Response.json({ data: { Page: {
+        pageInfo: { hasNextPage: false, total: 1 },
+        media: [{ id: 1, title: { native: "测试作品" }, isAdult: false }]
+      } } }));
+    const provider = new AniListProvider(fetcher);
+
+    await expect(provider.browseAnime({
+      era: "ALL", format: "ALL", genres: [], sort: "POPULARITY"
+    }, 1)).resolves.toMatchObject({ anime: [{ id: 1 }] });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares AniList's Retry-After delay with the automatic retry", async () => {
+    let currentTime = 0;
+    const sleep = vi.fn(async (milliseconds: number) => {
+      currentTime += milliseconds;
+    });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response("rate limited", {
+        status: 429,
+        headers: { "Retry-After": "3" }
+      }))
+      .mockResolvedValueOnce(Response.json({ data: { Page: {
+        pageInfo: { hasNextPage: false, total: 0 }, media: []
+      } } }));
+    const provider = new AniListProvider(
+      fetcher,
+      () => true,
+      Math.random,
+      () => 2026,
+      sleep,
+      () => currentTime,
+      0
+    );
+
+    await expect(provider.browseAnime({
+      era: "ALL", format: "ALL", genres: [], sort: "POPULARITY"
+    }, 1)).resolves.toMatchObject({ anime: [] });
+    expect(sleep).toHaveBeenCalledWith(3_000);
   });
 
   it("returns the AniList trending order and filters adult results", async () => {

@@ -135,7 +135,7 @@ function RandomAnimeCard({
 function toUserMessage(error: unknown): string {
   if (error instanceof AnimeApiError) {
     if (error.code === "offline") return "当前似乎处于离线状态。";
-    if (error.code === "rate_limited") return "抽取过于频繁，请稍后再试。";
+    if (error.code === "rate_limited") return "AniList 暂时繁忙，已自动重试仍未成功，请稍后再试。";
     return "无法连接动画数据服务，请稍后重试。";
   }
   return error instanceof Error ? error.message : "发生了未知错误。";

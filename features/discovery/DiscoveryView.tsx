@@ -33,6 +33,7 @@ export function DiscoveryView({ animeService, repository }: DiscoveryViewProps) 
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_DISCOVERY_FILTERS);
   const followActions = useFollowActions(repository);
   const randomKey = serializeDiscoveryFilters(filters);
+  const deferredFilters = useDebouncedFilters(filters);
 
   return (
     <section className="discovery-view" aria-labelledby="discovery-title">
@@ -55,12 +56,21 @@ export function DiscoveryView({ animeService, repository }: DiscoveryViewProps) 
       ) : null}
       <DiscoveryResults
         animeService={animeService}
-        filters={filters}
+        filters={deferredFilters}
         followActions={followActions}
       />
       <p className="trending-source">分类数据：AniList · 中文标题：Bangumi</p>
     </section>
   );
+}
+
+function useDebouncedFilters(filters: DiscoveryFilters): DiscoveryFilters {
+  const [deferredFilters, setDeferredFilters] = useState(filters);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDeferredFilters(filters), 350);
+    return () => window.clearTimeout(timer);
+  }, [filters]);
+  return deferredFilters;
 }
 
 function DiscoveryFilterPanel({
@@ -297,7 +307,7 @@ function DiscoveryLoading() {
 function toUserMessage(error: unknown): string {
   if (error instanceof AnimeApiError) {
     if (error.code === "offline") return "当前似乎处于离线状态，且没有可用缓存。";
-    if (error.code === "rate_limited") return "请求过于频繁，请稍后再试。";
+    if (error.code === "rate_limited") return "AniList 暂时繁忙，已自动重试仍未成功，请稍后再试。";
     return "无法连接动画数据服务，请稍后重试。";
   }
   return error instanceof Error ? error.message : "发生了未知错误。";

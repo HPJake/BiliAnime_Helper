@@ -23,6 +23,8 @@ import {
 
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
 const DISCOVERY_FORMATS = ["TV", "TV_SHORT", "ONA", "OVA", "MOVIE"] as const;
+const DEFAULT_RETRY_AFTER_SECONDS = 2;
+const MAX_RETRY_AFTER_SECONDS = 45;
 
 type AniListAiring = {
   mediaId?: number | null;
@@ -58,12 +60,18 @@ type AniListMedia = {
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export class AniListProvider implements AnimeProvider {
+  private requestTail: Promise<void> = Promise.resolve();
+  private blockedUntil = 0;
+
   constructor(
     private readonly fetcher: Fetcher = fetch,
     private readonly isOnline: () => boolean = () =>
       typeof navigator === "undefined" || navigator.onLine,
     private readonly random: () => number = Math.random,
-    private readonly currentYear: () => number = () => new Date().getFullYear()
+    private readonly currentYear: () => number = () => new Date().getFullYear(),
+    private readonly sleep: (milliseconds: number) => Promise<void> = wait,
+    private readonly now: () => number = Date.now,
+    private readonly requestIntervalMs = typeof window === "undefined" ? 0 : 700
   ) {}
 
   async searchAnime(query: string, limit = 10): Promise<Anime[]> {
@@ -232,22 +240,16 @@ export class AniListProvider implements AnimeProvider {
   }
 
   private async request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-    let response: Response;
-    try {
-      response = await this.fetcher.call(globalThis, ANILIST_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ query, variables })
-      });
-    } catch (error) {
-      throw normalizeApiError(error, { offline: !this.isOnline() });
+    let response = await this.fetch(query, variables);
+    if (response.status === 429) {
+      response = await this.fetch(query, variables);
     }
 
     if (!response.ok) {
       if (response.status === 429) {
         throw new AnimeApiError("rate_limited", "AniList rate limit reached", {
           status: 429,
-          retryAfterSeconds: parseRetryAfter(response.headers.get("Retry-After"))
+          retryAfterSeconds: retryAfter(response)
         });
       }
       throw new AnimeApiError("http", `AniList request failed with HTTP ${response.status}`, {
@@ -277,6 +279,36 @@ export class AniListProvider implements AnimeProvider {
       throw new AnimeApiError("invalid_response", "AniList response did not contain data");
     }
     return payload.data as T;
+  }
+
+  private async fetch(query: string, variables: Record<string, unknown>): Promise<Response> {
+    const previous = this.requestTail;
+    let release: (() => void) | undefined;
+    this.requestTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const waitFor = this.blockedUntil - this.now();
+      if (waitFor > 0) await this.sleep(waitFor);
+      let response: Response;
+      try {
+        response = await this.fetcher.call(globalThis, ANILIST_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ query, variables })
+        });
+      } catch (error) {
+        throw normalizeApiError(error, { offline: !this.isOnline() });
+      }
+      const cooldown = response.status === 429
+        ? retryAfter(response) * 1000
+        : this.requestIntervalMs;
+      this.blockedUntil = Math.max(this.blockedUntil, this.now() + cooldown);
+      return response;
+    } finally {
+      release?.();
+    }
   }
 }
 
@@ -400,6 +432,16 @@ function randomIndex(length: number, random: () => number): number {
   if (length <= 1) return 0;
   const value = Math.min(0.999999999, Math.max(0, random()));
   return Math.floor(value * length);
+}
+
+function retryAfter(response: Response): number {
+  const parsed = parseRetryAfter(response.headers.get("Retry-After"));
+  if (parsed === undefined) return DEFAULT_RETRY_AFTER_SECONDS;
+  return Math.min(MAX_RETRY_AFTER_SECONDS, Math.max(0, parsed));
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function cleanDescription(value: string): string {
