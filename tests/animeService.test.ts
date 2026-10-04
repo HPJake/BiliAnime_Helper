@@ -59,7 +59,7 @@ describe("AnimeService", () => {
     const service = new AnimeService(provider, cache, () => time);
 
     expect((await service.searchAnime(" Result ")).source).toBe("network");
-    expect((await cache.get("search:result:10"))?.expiresAt).toBe(time + CACHE_TTL.search);
+    expect((await cache.get("search:v2:result:10"))?.expiresAt).toBe(time + CACHE_TTL.search);
 
     time += 100;
     expect((await service.searchAnime("result")).source).toBe("cache");
@@ -111,11 +111,29 @@ describe("AnimeService", () => {
     const service = new AnimeService(provider, cache, () => time);
 
     expect((await service.getTrending(20)).source).toBe("network");
-    expect((await cache.get("trending:20"))?.expiresAt).toBe(time + CACHE_TTL.trending);
+    expect((await cache.get("trending:v2:20"))?.expiresAt).toBe(time + CACHE_TTL.trending);
     expect((await service.getCachedTrending(20))?.data).toHaveLength(1);
 
     time += CACHE_TTL.trending + 1;
     vi.mocked(provider.getTrending).mockRejectedValueOnce(new Error("offline"));
     expect(await service.getTrending(20)).toMatchObject({ source: "cache", stale: true });
+  });
+
+  it("shares concurrent requests for the same cache key", async () => {
+    const storage = new MemoryStorage();
+    const provider = createProvider();
+    let resolveRequest: ((anime: Awaited<ReturnType<AnimeProvider["getTrending"]>>) => void) | undefined;
+    vi.mocked(provider.getTrending).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRequest = resolve;
+    }));
+    const service = new AnimeService(provider, new CacheRepository(storage));
+
+    const first = service.getTrending(20);
+    const second = service.getTrending(20);
+    await vi.waitFor(() => expect(provider.getTrending).toHaveBeenCalledTimes(1));
+    resolveRequest?.([{ id: 1, title: {}, synonyms: [] }]);
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(provider.getTrending).toHaveBeenCalledTimes(1);
   });
 });

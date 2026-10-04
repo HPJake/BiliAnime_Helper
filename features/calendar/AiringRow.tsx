@@ -1,16 +1,21 @@
 import type { FollowedAnime } from "../../domain/anime";
-import { getAnimeDisplayTitle } from "../../domain/anime";
+import { getAnimeDisplayTitle, getChineseAnimeDisplayTitle } from "../../domain/anime";
 import { openBilibiliSearch } from "../../services/bilibili/openBilibiliSearch";
 import { formatLocalAiringTime, getLocalDateKey, type CalendarItem } from "./calendar";
 
 type AiringRowProps = {
   item: CalendarItem;
+  chineseOnly?: boolean;
   follow?: FollowedAnime;
   showDay?: boolean;
 };
 
-export function AiringRow({ item, follow, showDay = false }: AiringRowProps) {
-  const title = item.anime ? getAnimeDisplayTitle(item.anime) : `AniList #${item.event.animeId}`;
+export function AiringRow({ item, chineseOnly = false, follow, showDay = false }: AiringRowProps) {
+  const title = item.anime
+    ? chineseOnly
+      ? getChineseAnimeDisplayTitle(item.anime)
+      : getAnimeDisplayTitle(item.anime)
+    : `AniList #${item.event.animeId}`;
   const day = showDay
     ? getLocalDateKey(item.event.airingAt) === getLocalDateKey(Math.floor(Date.now() / 1000))
       ? "今天"

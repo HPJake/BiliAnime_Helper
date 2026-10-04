@@ -4,7 +4,7 @@ BiliAnime Helper is an unofficial Chrome/Edge Manifest V3 extension for Bilibili
 
 ## Current status
 
-M7 is complete. The popup is now a responsive, keyboard-accessible anime dashboard with a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, sequel-aware scheduling, Chinese title search, manual following, and video rotation. The background service worker maintains airing reminders and an unseen-episode badge that survives browser restarts.
+M8 is complete. The popup is a responsive, keyboard-accessible anime dashboard with Bilibili-aware light/dark appearance controls, local notification and badge settings, manual data refresh and cache cleanup, a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, sequel-aware scheduling, Chinese title search, manual following, and video rotation. Reliability coverage includes API outages, corrupted storage, missing fields, service-worker restarts, duplicate events, concurrent cache requests, and local write races.
 
 ## Development
 
@@ -25,7 +25,7 @@ To load a production build, open `chrome://extensions`, enable Developer mode, c
 
 - `entrypoints/popup`: React popup UI
 - `entrypoints/background.ts`: Manifest V3 service worker
-- `entrypoints/bilibili.content.ts`: content script limited to Bilibili video pages
+- `entrypoints/bilibili.content.ts`: lightweight Bilibili theme detection on site pages and video rotation on playback pages
 - `features/rotation`: isolated video detection, rotation lifecycle, and pure fit calculations
 - `domain`: normalized app types that do not expose AniList response objects
 - `services/anime`: provider abstraction, cached service, AniList schedules, and Bangumi Chinese-title enrichment
@@ -38,9 +38,10 @@ To load a production build, open `chrome://extensions`, enable Developer mode, c
 - `features/upcoming`: paginated current-season schedule for all upcoming anime in the next seven days
 - `features/trending`: AniList Top 20, dashboard Top 3 preview, metadata formatting, and cached outage states
 - `features/dashboard`: popup navigation model and keyboard tab behavior
-- `domain`, `storage`, `services`, `features`, `components`: reserved boundaries for later milestones
+- `features/settings` and `services/settings`: local preferences, refresh, cache cleanup, and background synchronization
+- `features/theme` and `services/theme`: Bilibili theme inference, system fallback, and active-tab theme resolution
 
-The extension requests only `storage`, `alarms`, and `notifications`, plus AniList and Bangumi API host access. It does not read Bilibili cookies or user account data.
+The extension requests only `storage`, `alarms`, and `notifications`, plus AniList and Bangumi API host access. On Bilibili pages, it reads only visual theme signals (including the `theme_style` value when present) and returns the resolved light/dark value to the popup; it does not collect account data or transmit cookie contents.
 
 ## Privacy
 

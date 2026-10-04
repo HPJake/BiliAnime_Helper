@@ -12,6 +12,7 @@ describe("AppRepository", () => {
 
     expect(storage.values.get(STORAGE_KEYS.schemaVersion)).toBe(STORAGE_SCHEMA_VERSION);
     expect(storage.values.get(STORAGE_KEYS.followedAnime)).toEqual([]);
+    expect(await repository.getSettings()).toMatchObject({ themePreference: "auto" });
   });
 
   it("saves and reloads followed anime", async () => {
@@ -38,6 +39,14 @@ describe("AppRepository", () => {
     await repository.followAnime(1);
 
     expect(await repository.getFollowedAnime()).toHaveLength(1);
+  });
+
+  it("serializes concurrent follow writes without losing an anime", async () => {
+    const repository = new AppRepository(new MemoryStorage(), () => 100);
+
+    await Promise.all([repository.followAnime(1), repository.followAnime(2)]);
+
+    expect((await repository.getFollowedAnime()).map((item) => item.aniListId)).toEqual([1, 2]);
   });
 
   it("ignores corrupted followed entries", async () => {
@@ -78,5 +87,50 @@ describe("AppRepository", () => {
     });
     expect(await repository.getScheduledAiringEvents()).toHaveLength(1);
     expect(storage.values.get(STORAGE_KEYS.schemaVersion)).toBe(STORAGE_SCHEMA_VERSION);
+  });
+
+  it("repairs corrupted arrays during migration", async () => {
+    const storage = new MemoryStorage();
+    await storage.set({
+      [STORAGE_KEYS.schemaVersion]: 1,
+      [STORAGE_KEYS.followedAnime]: [
+        null,
+        { aniListId: "bad", addedAt: 1 },
+        { aniListId: 7, addedAt: 10 }
+      ],
+      [STORAGE_KEYS.scheduledAiringEvents]: [
+        { animeId: 7, followedAnimeId: 7, episode: 1, airingAt: 100, title: "A", searchTitle: "A" },
+        { animeId: 0, episode: "bad" }
+      ]
+    });
+    const repository = new AppRepository(storage);
+
+    await repository.initialize();
+
+    expect(storage.values.get(STORAGE_KEYS.followedAnime)).toEqual([{ aniListId: 7, addedAt: 10 }]);
+    expect(await repository.getScheduledAiringEvents()).toEqual([
+      { animeId: 7, followedAnimeId: 7, episode: 1, airingAt: 100, title: "A", searchTitle: "A" }
+    ]);
+  });
+
+  it("migrates legacy settings to follow the Bilibili theme", async () => {
+    const storage = new MemoryStorage();
+    await storage.set({
+      [STORAGE_KEYS.schemaVersion]: 2,
+      [STORAGE_KEYS.settings]: {
+        notificationsEnabled: false,
+        badgeEnabled: true,
+        timezoneMode: "local"
+      }
+    });
+
+    const settings = await new AppRepository(storage).getSettings();
+
+    expect(settings).toEqual({
+      notificationsEnabled: false,
+      badgeEnabled: true,
+      themePreference: "auto",
+      timezoneMode: "local"
+    });
   });
 });

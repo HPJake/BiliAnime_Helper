@@ -7,7 +7,7 @@ import {
   type ScheduledAiringEvent
 } from "../domain/settings";
 
-export const STORAGE_SCHEMA_VERSION = 2;
+export const STORAGE_SCHEMA_VERSION = 3;
 
 export const STORAGE_KEYS = {
   schemaVersion: "schemaVersion",

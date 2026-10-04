@@ -142,6 +142,7 @@ describe("AiringNotificationScheduler", () => {
     await repository.saveSettings({
       notificationsEnabled: false,
       badgeEnabled: true,
+      themePreference: "auto",
       timezoneMode: "local"
     });
     await repository.saveScheduledAiringEvents([scheduledEvent()]);
@@ -165,6 +166,37 @@ describe("AiringNotificationScheduler", () => {
 
     expect((await repository.getNotificationState()).unseenEventIds).toEqual([]);
     expect(platform.badgeTexts.at(-1)).toBe("");
+  });
+
+  it("applies badge setting changes immediately", async () => {
+    const repository = new AppRepository(new MemoryStorage(), () => NOW_MS);
+    const id = createAiringEventId(scheduledEvent());
+    await repository.saveNotificationState({ notifiedEventIds: [id], unseenEventIds: [id] });
+    await repository.saveSettings({ notificationsEnabled: true, badgeEnabled: false, themePreference: "auto", timezoneMode: "local" });
+    const platform = new MemoryPlatform();
+    const scheduler = new AiringNotificationScheduler(repository, animeService(), platform, () => NOW_MS);
+
+    await scheduler.applySettings();
+    await repository.saveSettings({ notificationsEnabled: true, badgeEnabled: true, themePreference: "auto", timezoneMode: "local" });
+    await scheduler.applySettings();
+
+    expect(platform.badgeTexts).toEqual(["", "1"]);
+  });
+
+  it("reports a manual refresh failure when every followed schedule request fails", async () => {
+    const repository = new AppRepository(new MemoryStorage(), () => NOW_MS);
+    await repository.followAnime(10);
+    const failingService: AnimeSeriesService = {
+      getAnimeSeries: vi.fn(async () => { throw new Error("offline"); })
+    };
+    const scheduler = new AiringNotificationScheduler(
+      repository,
+      failingService,
+      new MemoryPlatform(),
+      () => NOW_MS
+    );
+
+    await expect(scheduler.refreshNow()).rejects.toThrow("Unable to refresh followed anime schedules");
   });
 
   it("opens the stored Bilibili search when a notification is clicked", async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getAnimeDisplayTitle } from "../domain/anime";
 import { mapAniListMedia } from "../services/anime/AniListProvider";
 
 describe("mapAniListMedia", () => {
@@ -56,5 +57,6 @@ describe("mapAniListMedia", () => {
       title: {},
       synonyms: []
     });
+    expect(getAnimeDisplayTitle({ id: 42, title: {}, synonyms: [] })).toBe("AniList 42");
   });
 });

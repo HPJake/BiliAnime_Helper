@@ -54,16 +54,19 @@ export default defineBackground(() => {
     void scheduler.handleNotificationClick(notificationId).catch(reportBackgroundError);
   });
   browser.runtime.onMessage.addListener((message: unknown) => {
-    if (isPopupOpenedMessage(message)) return scheduler.markAllSeen();
+    const type = getMessageType(message);
+    if (type === "popup-opened") return scheduler.markAllSeen();
+    if (type === "settings-updated") return scheduler.applySettings();
+    if (type === "refresh-data-now") return scheduler.refreshNow();
     return undefined;
   });
 
   void scheduler.start().catch(reportBackgroundError);
 });
 
-function isPopupOpenedMessage(message: unknown): message is { type: "popup-opened" } {
-  return typeof message === "object" && message !== null &&
-    "type" in message && message.type === "popup-opened";
+function getMessageType(message: unknown): string | null {
+  if (typeof message !== "object" || message === null || !("type" in message)) return null;
+  return typeof message.type === "string" ? message.type : null;
 }
 
 function reportBackgroundError(error: unknown): void {

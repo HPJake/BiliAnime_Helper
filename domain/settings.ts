@@ -1,8 +1,10 @@
 import type { AiringEvent } from "./airing";
+import type { ThemePreference } from "../features/theme/theme";
 
 export type AppSettings = {
   notificationsEnabled: boolean;
   badgeEnabled: boolean;
+  themePreference: ThemePreference;
   timezoneMode: "local";
 };
 
@@ -20,6 +22,7 @@ export type ScheduledAiringEvent = AiringEvent & {
 export const DEFAULT_SETTINGS: AppSettings = {
   notificationsEnabled: true,
   badgeEnabled: true,
+  themePreference: "auto",
   timezoneMode: "local"
 };
 

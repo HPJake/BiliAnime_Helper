@@ -1,9 +1,11 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { browser } from "wxt/browser";
+import { DEFAULT_SETTINGS } from "../../domain/settings";
 import { CalendarView } from "../../features/calendar/CalendarView";
 import { MyAnimeView } from "../../features/following/MyAnimeView";
 import { UpcomingAnimeView } from "../../features/upcoming/UpcomingAnimeView";
 import { TrendingPreview, TrendingView } from "../../features/trending/TrendingView";
+import { SettingsView } from "../../features/settings/SettingsView";
 import {
   DASHBOARD_TABS,
   getKeyboardTab,
@@ -15,19 +17,69 @@ import { BangumiTitleProvider } from "../../services/anime/BangumiTitleProvider"
 import { LocalizedAnimeProvider } from "../../services/anime/LocalizedAnimeProvider";
 import { browserStorageArea, createAppRepository } from "../../storage/browserStorage";
 import { CacheRepository } from "../../utils/cache";
+import { SettingsService } from "../../services/settings/SettingsService";
+import { getActiveBilibiliTheme } from "../../services/theme/ActiveBilibiliTheme";
+import {
+  resolveThemePreference,
+  type ResolvedTheme,
+  type ThemePreference
+} from "../../features/theme/theme";
 
 const repository = createAppRepository();
+const cacheRepository = new CacheRepository(browserStorageArea);
 const animeService = new AnimeService(
   new LocalizedAnimeProvider(new AniListProvider(), new BangumiTitleProvider()),
-  new CacheRepository(browserStorageArea)
+  cacheRepository
+);
+const settingsService = new SettingsService(
+  repository,
+  cacheRepository,
+  async (message) => {
+    await browser.runtime.sendMessage(message);
+  }
 );
 
 export function App() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("today");
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    DEFAULT_SETTINGS.themePreference
+  );
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
 
   useEffect(() => {
     void browser.runtime.sendMessage({ type: "popup-opened" }).catch(() => undefined);
+    void settingsService.getSettings()
+      .then((settings) => setThemePreference(settings.themePreference))
+      .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = async () => {
+      const bilibiliTheme = themePreference === "auto"
+        ? await getActiveBilibiliTheme()
+        : null;
+      if (cancelled) return;
+      setResolvedTheme(resolveThemePreference(
+        themePreference,
+        bilibiliTheme,
+        media.matches ? "dark" : "light"
+      ));
+    };
+    const handleSystemThemeChange = () => void applyTheme();
+    void applyTheme();
+    media.addEventListener("change", handleSystemThemeChange);
+    return () => {
+      cancelled = true;
+      media.removeEventListener("change", handleSystemThemeChange);
+    };
+  }, [themePreference]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
 
   function selectTab(tab: DashboardTab) {
     setActiveTab(tab);
@@ -44,6 +96,15 @@ export function App() {
   let panel: ReactNode;
   if (activeTab === "my-anime") {
     panel = <MyAnimeView animeService={animeService} repository={repository} />;
+  } else if (activeTab === "settings") {
+    panel = (
+      <SettingsView
+        onThemePreferenceChange={setThemePreference}
+        resolvedTheme={resolvedTheme}
+        service={settingsService}
+        version={browser.runtime.getManifest().version}
+      />
+    );
   } else if (activeTab === "upcoming") {
     panel = <UpcomingAnimeView animeService={animeService} />;
   } else if (activeTab === "trending") {
@@ -107,7 +168,8 @@ const TAB_LABELS: Record<DashboardTab, string> = {
   calendar: "日历",
   upcoming: "新番",
   trending: "趋势",
-  "my-anime": "追番"
+  "my-anime": "追番",
+  settings: "设置"
 };
 
 type TabButtonProps = {

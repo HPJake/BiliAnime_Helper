@@ -196,6 +196,7 @@ export function MyAnimeView({ animeService, repository }: MyAnimeViewProps) {
               {searchLoading ? "搜索中…" : "搜索"}
             </button>
           </form>
+          <p className="schedule-note">搜索结果按最新年份和季度优先排列。</p>
 
           {searchError ? <StateMessage title="暂时无法搜索" detail={searchError} tone="error" /> : null}
           {searchStale ? <StateMessage title="正在显示缓存结果" detail="在线数据未能刷新。" tone="warning" /> : null}
@@ -203,7 +204,7 @@ export function MyAnimeView({ animeService, repository }: MyAnimeViewProps) {
             <StateMessage title="没有找到番剧" detail="请尝试其他中文译名、日文名或英文名。" />
           ) : null}
           {searchResults.length > 0 ? (
-            <div className="anime-list search-results" aria-label="番剧搜索结果">
+            <div className="anime-list search-results" aria-label="番剧搜索结果（最新季度优先）">
               {searchResults.map((anime) => (
                 <AnimeRow
                   key={anime.id}
@@ -266,7 +267,11 @@ type AnimeRowProps = {
 
 function AnimeRow({ anime, searchAlias, actionLabel, actionBusy, onAction }: AnimeRowProps) {
   const title = getAnimeDisplayTitle(anime);
-  const metadata = [anime.seasonYear, anime.status ? formatStatus(anime.status) : null]
+  const metadata = [
+    anime.seasonYear,
+    anime.season ? formatSeason(anime.season) : null,
+    anime.status ? formatStatus(anime.status) : null
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -308,6 +313,16 @@ function formatStatus(status: string): string {
     HIATUS: "暂停播出"
   };
   return labels[status] ?? status;
+}
+
+function formatSeason(season: string): string {
+  const labels: Record<string, string> = {
+    WINTER: "冬季",
+    SPRING: "春季",
+    SUMMER: "夏季",
+    FALL: "秋季"
+  };
+  return labels[season] ?? season;
 }
 
 function toUserMessage(error: unknown): string {

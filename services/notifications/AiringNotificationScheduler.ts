@@ -76,12 +76,25 @@ export class AiringNotificationScheduler {
     });
   }
 
+  refreshNow(): Promise<void> {
+    return this.enqueue(async () => {
+      const result = await this.refreshScheduleInternal();
+      if (result.requested > 0 && result.succeeded === 0) {
+        throw new Error("Unable to refresh followed anime schedules");
+      }
+    });
+  }
+
   markAllSeen(): Promise<void> {
     return this.enqueue(async () => {
       const state = await this.repository.getNotificationState();
       await this.repository.saveNotificationState({ ...state, unseenEventIds: [] });
       await this.syncBadge();
     });
+  }
+
+  applySettings(): Promise<void> {
+    return this.enqueue(() => this.syncBadge());
   }
 
   handleNotificationClick(notificationId: string): Promise<void> {
@@ -103,7 +116,7 @@ export class AiringNotificationScheduler {
     });
   }
 
-  private async refreshScheduleInternal(): Promise<void> {
+  private async refreshScheduleInternal(): Promise<{ requested: number; succeeded: number }> {
     const nowSeconds = Math.floor(this.now() / 1000);
     const followed = await this.repository.getFollowedAnime();
     const followedIds = new Set(followed.map((item) => item.aniListId));
@@ -137,6 +150,7 @@ export class AiringNotificationScheduler {
     const events = mergeEvents(retained, incoming, nowSeconds);
     await this.repository.saveScheduledAiringEvents(events);
     await this.processDueEventsInternal();
+    return { requested: followed.length, succeeded: successfulFollowedIds.size };
   }
 
   private async processDueEventsInternal(): Promise<void> {

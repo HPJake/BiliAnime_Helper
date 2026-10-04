@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { StateMessage } from "../../components/StateMessage";
-import { getAnimeDisplayTitle, type Anime } from "../../domain/anime";
+import { getChineseAnimeDisplayTitle, type Anime } from "../../domain/anime";
 import type { AnimeService } from "../../services/anime/AnimeService";
 import { AnimeApiError } from "../../services/anime/errors";
 import { openBilibiliSearch } from "../../services/bilibili/openBilibiliSearch";
@@ -35,7 +35,7 @@ export function TrendingView({ animeService }: TrendingProps) {
       <p className="schedule-note">AniList 站内动画趋势，不代表所有动画平台的客观排名。</p>
       <TrendingState data={data} />
       {!data.loading && data.anime.length > 0 ? <TrendingList anime={data.anime} /> : null}
-      <p className="trending-source">Powered by AniList</p>
+      <p className="trending-source">趋势数据：AniList · 中文标题：Bangumi</p>
     </section>
   );
 }
@@ -60,7 +60,7 @@ export function TrendingPreview({ animeService, onOpenTrending }: TrendingPrevie
       {!data.loading && data.anime.length > 0 ? (
         <TrendingList anime={data.anime.slice(0, 3)} compact />
       ) : null}
-      <p className="trending-source">Powered by AniList</p>
+      <p className="trending-source">趋势数据：AniList · 中文标题：Bangumi</p>
     </section>
   );
 }
@@ -87,7 +87,7 @@ function TrendingList({ anime, compact = false }: { anime: Anime[]; compact?: bo
 }
 
 function TrendingRow({ anime, compact, rank }: { anime: Anime; compact: boolean; rank: number }) {
-  const title = getAnimeDisplayTitle(anime);
+  const title = getChineseAnimeDisplayTitle(anime);
   const metadata = getTrendingMetadata(anime);
   return (
     <li className="trending-row">

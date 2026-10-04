@@ -28,7 +28,7 @@ export class AnimeService {
   searchAnime(query: string, limit = 10): Promise<AnimeDataResult<Anime[]>> {
     const normalized = query.trim().toLocaleLowerCase();
     if (!normalized) return Promise.resolve({ data: [], source: "cache", stale: false });
-    return this.load(`search:${normalized}:${limit}`, CACHE_TTL.search, () =>
+    return this.load(`search:v2:${normalized}:${limit}`, CACHE_TTL.search, () =>
       this.provider.searchAnime(query.trim(), limit)
     );
   }
@@ -70,7 +70,7 @@ export class AnimeService {
     seasonYear: number
   ): Promise<AnimeDataResult<UpcomingAnimeSchedule>> {
     return this.load(
-      `upcoming:v1:${season}:${seasonYear}:${from}:${to}`,
+      `upcoming:v2:${season}:${seasonYear}:${from}:${to}`,
       CACHE_TTL.airing,
       () => this.provider.getUpcomingAnimeSchedule(from, to, season, seasonYear)
     );
@@ -82,17 +82,17 @@ export class AnimeService {
     season: AnimeSeason,
     seasonYear: number
   ): Promise<AnimeDataResult<UpcomingAnimeSchedule> | null> {
-    return this.peek(`upcoming:v1:${season}:${seasonYear}:${from}:${to}`);
+    return this.peek(`upcoming:v2:${season}:${seasonYear}:${from}:${to}`);
   }
 
   getTrending(limit = 20): Promise<AnimeDataResult<Anime[]>> {
-    return this.load(`trending:${limit}`, CACHE_TTL.trending, () =>
+    return this.load(`trending:v2:${limit}`, CACHE_TTL.trending, () =>
       this.provider.getTrending(limit)
     );
   }
 
   getCachedTrending(limit = 20): Promise<AnimeDataResult<Anime[]> | null> {
-    return this.peek(`trending:${limit}`);
+    return this.peek(`trending:v2:${limit}`);
   }
 
   private async peek<T>(key: string): Promise<AnimeDataResult<T> | null> {

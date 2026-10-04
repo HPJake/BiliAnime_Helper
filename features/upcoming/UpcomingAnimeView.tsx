@@ -82,7 +82,7 @@ export function UpcomingAnimeView({ animeService }: UpcomingAnimeViewProps) {
               {day.items.length > 0 ? (
                 <div className="airing-list">
                   {day.items.map((item) => (
-                    <AiringRow key={eventKey(item.event)} item={item} />
+                    <AiringRow key={eventKey(item.event)} item={item} chineseOnly />
                   ))}
                 </div>
               ) : null}

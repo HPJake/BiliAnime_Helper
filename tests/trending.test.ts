@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { Anime } from "../domain/anime";
-import { formatAnimeStatus, getTrendingMetadata } from "../features/trending/trending";
+import { getChineseAnimeDisplayTitle, type Anime } from "../domain/anime";
+import {
+  formatAnimeStatus,
+  getTrendingMetadata
+} from "../features/trending/trending";
 
 describe("trending presentation", () => {
   it("formats Chinese status, season, episode count and next airing metadata", () => {
@@ -23,5 +26,13 @@ describe("trending presentation", () => {
 
   it("keeps unknown AniList statuses readable", () => {
     expect(formatAnimeStatus("UNKNOWN_STATUS")).toBe("UNKNOWN_STATUS");
+  });
+
+  it("never falls back to a Japanese title in the trending interface", () => {
+    expect(getChineseAnimeDisplayTitle({
+      id: 42,
+      title: { native: "薬屋のひとりごと" },
+      synonyms: []
+    })).toBe("中文标题待补充（AniList #42）");
   });
 });

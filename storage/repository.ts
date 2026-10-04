@@ -19,6 +19,7 @@ export interface StorageArea {
 
 export class AppRepository {
   private initialization: Promise<void> | null = null;
+  private mutationQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly storage: StorageArea,
@@ -40,31 +41,37 @@ export class AppRepository {
 
   async saveFollowedAnime(followedAnime: FollowedAnime): Promise<void> {
     if (!isFollowedAnime(followedAnime)) throw new TypeError("Invalid followed anime");
-    const current = await this.getFollowedAnime();
-    const next = current.filter((item) => item.aniListId !== followedAnime.aniListId);
-    next.push({ ...followedAnime });
-    await this.storage.set({ [STORAGE_KEYS.followedAnime]: next });
+    await this.enqueueMutation(async () => {
+      const current = await this.getFollowedAnime();
+      const next = current.filter((item) => item.aniListId !== followedAnime.aniListId);
+      next.push({ ...followedAnime });
+      await this.storage.set({ [STORAGE_KEYS.followedAnime]: next });
+    });
   }
 
   async followAnime(aniListId: number, bilibiliSearchAlias?: string): Promise<FollowedAnime> {
     if (!Number.isInteger(aniListId) || aniListId <= 0) throw new TypeError("Invalid AniList ID");
-    const current = await this.getFollowedAnime();
-    const existing = current.find((item) => item.aniListId === aniListId);
-    if (existing) return existing;
+    return this.enqueueMutation(async () => {
+      const current = await this.getFollowedAnime();
+      const existing = current.find((item) => item.aniListId === aniListId);
+      if (existing) return existing;
 
-    const followed: FollowedAnime = {
-      aniListId,
-      addedAt: this.now(),
-      ...(bilibiliSearchAlias ? { bilibiliSearchAlias } : {})
-    };
-    await this.storage.set({ [STORAGE_KEYS.followedAnime]: [...current, followed] });
-    return followed;
+      const followed: FollowedAnime = {
+        aniListId,
+        addedAt: this.now(),
+        ...(bilibiliSearchAlias ? { bilibiliSearchAlias } : {})
+      };
+      await this.storage.set({ [STORAGE_KEYS.followedAnime]: [...current, followed] });
+      return followed;
+    });
   }
 
   async unfollowAnime(aniListId: number): Promise<void> {
-    const current = await this.getFollowedAnime();
-    await this.storage.set({
-      [STORAGE_KEYS.followedAnime]: current.filter((item) => item.aniListId !== aniListId)
+    await this.enqueueMutation(async () => {
+      const current = await this.getFollowedAnime();
+      await this.storage.set({
+        [STORAGE_KEYS.followedAnime]: current.filter((item) => item.aniListId !== aniListId)
+      });
     });
   }
 
@@ -80,14 +87,20 @@ export class AppRepository {
           : DEFAULT_SETTINGS.notificationsEnabled,
       badgeEnabled:
         typeof value.badgeEnabled === "boolean" ? value.badgeEnabled : DEFAULT_SETTINGS.badgeEnabled,
+      themePreference:
+        value.themePreference === "auto" || value.themePreference === "light" || value.themePreference === "dark"
+          ? value.themePreference
+          : DEFAULT_SETTINGS.themePreference,
       timezoneMode: "local"
     };
   }
 
   async saveSettings(settings: AppSettings): Promise<void> {
     if (!isAppSettings(settings)) throw new TypeError("Invalid app settings");
-    await this.initialize();
-    await this.storage.set({ [STORAGE_KEYS.settings]: { ...settings } });
+    await this.enqueueMutation(async () => {
+      await this.initialize();
+      await this.storage.set({ [STORAGE_KEYS.settings]: { ...settings } });
+    });
   }
 
   async getNotificationState(): Promise<NotificationState> {
@@ -103,9 +116,11 @@ export class AppRepository {
 
   async saveNotificationState(state: NotificationState): Promise<void> {
     if (!isNotificationState(state)) throw new TypeError("Invalid notification state");
-    await this.initialize();
-    await this.storage.set({
-      [STORAGE_KEYS.notificationState]: cloneNotificationState(state)
+    await this.enqueueMutation(async () => {
+      await this.initialize();
+      await this.storage.set({
+        [STORAGE_KEYS.notificationState]: cloneNotificationState(state)
+      });
     });
   }
 
@@ -120,10 +135,18 @@ export class AppRepository {
 
   async saveScheduledAiringEvents(events: ScheduledAiringEvent[]): Promise<void> {
     if (!events.every(isScheduledAiringEvent)) throw new TypeError("Invalid scheduled airing events");
-    await this.initialize();
-    await this.storage.set({
-      [STORAGE_KEYS.scheduledAiringEvents]: events.map((event) => ({ ...event }))
+    await this.enqueueMutation(async () => {
+      await this.initialize();
+      await this.storage.set({
+        [STORAGE_KEYS.scheduledAiringEvents]: events.map((event) => ({ ...event }))
+      });
     });
+  }
+
+  private enqueueMutation<T>(mutation: () => Promise<T>): Promise<T> {
+    const result = this.mutationQueue.then(mutation, mutation);
+    this.mutationQueue = result.catch(() => undefined);
+    return result;
   }
 }
 
@@ -149,6 +172,7 @@ function isAppSettings(value: unknown): value is AppSettings {
   return (
     typeof value.notificationsEnabled === "boolean" &&
     typeof value.badgeEnabled === "boolean" &&
+    (value.themePreference === "auto" || value.themePreference === "light" || value.themePreference === "dark") &&
     value.timezoneMode === "local"
   );
 }
