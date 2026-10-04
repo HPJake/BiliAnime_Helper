@@ -106,9 +106,9 @@ export function App() {
       />
     );
   } else if (activeTab === "upcoming") {
-    panel = <UpcomingAnimeView animeService={animeService} />;
+    panel = <UpcomingAnimeView animeService={animeService} repository={repository} />;
   } else if (activeTab === "trending") {
-    panel = <TrendingView animeService={animeService} />;
+    panel = <TrendingView animeService={animeService} repository={repository} />;
   } else {
     panel = (
       <div className={activeTab === "today" ? "dashboard-view" : undefined}>
@@ -119,7 +119,11 @@ export function App() {
           repository={repository}
         />
         {activeTab === "today" ? (
-          <TrendingPreview animeService={animeService} onOpenTrending={() => selectTab("trending")} />
+          <TrendingPreview
+            animeService={animeService}
+            onOpenTrending={() => selectTab("trending")}
+            repository={repository}
+          />
         ) : null}
       </div>
     );

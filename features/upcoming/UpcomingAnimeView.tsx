@@ -3,7 +3,10 @@ import { StateMessage } from "../../components/StateMessage";
 import type { AiringEvent, AnimeSeason, UpcomingAnimeSchedule } from "../../domain/airing";
 import type { Anime } from "../../domain/anime";
 import type { AnimeService } from "../../services/anime/AnimeService";
+import type { AppRepository } from "../../storage/repository";
 import { AiringRow } from "../calendar/AiringRow";
+import { FollowAnimeButton } from "../following/FollowAnimeButton";
+import { useFollowActions } from "../following/useFollowActions";
 import {
   buildWeeklyCalendar,
   getAnimeSeason,
@@ -12,6 +15,7 @@ import {
 
 type UpcomingAnimeViewProps = {
   animeService: AnimeService;
+  repository: AppRepository;
 };
 
 type UpcomingData = {
@@ -23,11 +27,12 @@ type UpcomingData = {
   warning: string | null;
 };
 
-export function UpcomingAnimeView({ animeService }: UpcomingAnimeViewProps) {
+export function UpcomingAnimeView({ animeService, repository }: UpcomingAnimeViewProps) {
   const now = useMemo(() => new Date(), []);
   const range = useMemo(() => getLocalCalendarRange(now), [now]);
   const season = useMemo(() => getAnimeSeason(now), [now]);
   const data = useUpcomingData(animeService, range, season);
+  const followActions = useFollowActions(repository);
   const upcomingEvents = useMemo(() => {
     const nowSeconds = Math.floor(now.getTime() / 1000);
     return data.events.filter((event) => event.airingAt >= nowSeconds && event.airingAt < range.to);
@@ -60,6 +65,7 @@ export function UpcomingAnimeView({ animeService }: UpcomingAnimeViewProps) {
       ) : null}
       {data.error ? <StateMessage title="暂时无法加载新番排期" detail={data.error} tone="error" /> : null}
       {data.warning ? <StateMessage title="正在使用缓存数据" detail={data.warning} tone="warning" /> : null}
+      {followActions.error ? <StateMessage title="无法更新追番状态" detail={followActions.error} tone="warning" /> : null}
       {data.loading ? <UpcomingLoading /> : null}
 
       {!data.loading && !data.error && upcomingEvents.length === 0 ? (
@@ -82,7 +88,14 @@ export function UpcomingAnimeView({ animeService }: UpcomingAnimeViewProps) {
               {day.items.length > 0 ? (
                 <div className="airing-list">
                   {day.items.map((item) => (
-                    <AiringRow key={eventKey(item.event)} item={item} chineseOnly />
+                    <AiringRow
+                      action={item.anime
+                        ? <FollowAnimeButton actions={followActions} anime={item.anime} />
+                        : undefined}
+                      key={eventKey(item.event)}
+                      item={item}
+                      chineseOnly
+                    />
                   ))}
                 </div>
               ) : null}

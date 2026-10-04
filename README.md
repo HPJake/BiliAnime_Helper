@@ -4,7 +4,7 @@ BiliAnime Helper is an unofficial Chrome/Edge Manifest V3 extension for Bilibili
 
 ## Current status
 
-M8 is complete. The popup is a responsive, keyboard-accessible anime dashboard with Bilibili-aware light/dark appearance controls, local notification and badge settings, manual data refresh and cache cleanup, a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, sequel-aware scheduling, Chinese title search, manual following, and video rotation. Reliability coverage includes API outages, corrupted storage, missing fields, service-worker restarts, duplicate events, concurrent cache requests, and local write races.
+M8 is complete. The popup is a responsive, keyboard-accessible anime dashboard with Bilibili-aware light/dark appearance controls, local notification and badge settings, manual data refresh and cache cleanup, a Chinese Today view, a vertical seven-day timeline, a current-season upcoming-anime schedule, AniList Global Trending Top 20 with a Top 3 dashboard preview, one-click follow actions in upcoming and trending cards, sequel-aware scheduling, Chinese title search, manual following, and video rotation. Reliability coverage includes API outages, corrupted storage, missing fields, service-worker restarts, duplicate events, concurrent cache requests, and local write races.
 
 ## Development
 

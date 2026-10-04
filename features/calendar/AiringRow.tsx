@@ -1,16 +1,18 @@
+import type { ReactNode } from "react";
 import type { FollowedAnime } from "../../domain/anime";
 import { getAnimeDisplayTitle, getChineseAnimeDisplayTitle } from "../../domain/anime";
 import { openBilibiliSearch } from "../../services/bilibili/openBilibiliSearch";
 import { formatLocalAiringTime, getLocalDateKey, type CalendarItem } from "./calendar";
 
 type AiringRowProps = {
+  action?: ReactNode;
   item: CalendarItem;
   chineseOnly?: boolean;
   follow?: FollowedAnime;
   showDay?: boolean;
 };
 
-export function AiringRow({ item, chineseOnly = false, follow, showDay = false }: AiringRowProps) {
+export function AiringRow({ action, item, chineseOnly = false, follow, showDay = false }: AiringRowProps) {
   const title = item.anime
     ? chineseOnly
       ? getChineseAnimeDisplayTitle(item.anime)
@@ -25,7 +27,7 @@ export function AiringRow({ item, chineseOnly = false, follow, showDay = false }
     : null;
 
   return (
-    <article className="airing-row">
+    <article className={`airing-row${action ? " airing-row--action" : ""}`}>
       <time dateTime={new Date(item.event.airingAt * 1000).toISOString()}>
         {formatLocalAiringTime(item.event.airingAt)}
       </time>
@@ -45,6 +47,7 @@ export function AiringRow({ item, chineseOnly = false, follow, showDay = false }
         ) : <strong>{title}</strong>}
         <span>{day ? `${day} · ` : ""}第 {item.event.episode} 集预计播出</span>
       </div>
+      {action}
     </article>
   );
 }

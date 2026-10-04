@@ -4,6 +4,9 @@ import { getChineseAnimeDisplayTitle, type Anime } from "../../domain/anime";
 import type { AnimeService } from "../../services/anime/AnimeService";
 import { AnimeApiError } from "../../services/anime/errors";
 import { openBilibiliSearch } from "../../services/bilibili/openBilibiliSearch";
+import type { AppRepository } from "../../storage/repository";
+import { FollowAnimeButton } from "../following/FollowAnimeButton";
+import { useFollowActions, type FollowActions } from "../following/useFollowActions";
 import { getTrendingMetadata } from "./trending";
 
 const TRENDING_LIMIT = 20;
@@ -18,10 +21,12 @@ type TrendingData = {
 
 type TrendingProps = {
   animeService: AnimeService;
+  repository: AppRepository;
 };
 
-export function TrendingView({ animeService }: TrendingProps) {
+export function TrendingView({ animeService, repository }: TrendingProps) {
   const data = useTrendingData(animeService);
+  const followActions = useFollowActions(repository);
 
   return (
     <section className="trending-view" aria-labelledby="trending-title">
@@ -34,7 +39,10 @@ export function TrendingView({ animeService }: TrendingProps) {
       </div>
       <p className="schedule-note">AniList 站内动画趋势，不代表所有动画平台的客观排名。</p>
       <TrendingState data={data} />
-      {!data.loading && data.anime.length > 0 ? <TrendingList anime={data.anime} /> : null}
+      {followActions.error ? <StateMessage title="无法更新追番状态" detail={followActions.error} tone="warning" /> : null}
+      {!data.loading && data.anime.length > 0 ? (
+        <TrendingList anime={data.anime} followActions={followActions} />
+      ) : null}
       <p className="trending-source">趋势数据：AniList · 中文标题：Bangumi</p>
     </section>
   );
@@ -44,8 +52,9 @@ type TrendingPreviewProps = TrendingProps & {
   onOpenTrending: () => void;
 };
 
-export function TrendingPreview({ animeService, onOpenTrending }: TrendingPreviewProps) {
+export function TrendingPreview({ animeService, onOpenTrending, repository }: TrendingPreviewProps) {
   const data = useTrendingData(animeService);
+  const followActions = useFollowActions(repository);
 
   return (
     <section className="trending-preview" aria-labelledby="trending-preview-title">
@@ -57,8 +66,9 @@ export function TrendingPreview({ animeService, onOpenTrending }: TrendingPrevie
         <button type="button" className="text-link-button" onClick={onOpenTrending}>查看 Top 20</button>
       </div>
       <TrendingState data={data} compact />
+      {followActions.error ? <StateMessage title="无法更新追番状态" detail={followActions.error} tone="warning" /> : null}
       {!data.loading && data.anime.length > 0 ? (
-        <TrendingList anime={data.anime.slice(0, 3)} compact />
+        <TrendingList anime={data.anime.slice(0, 3)} compact followActions={followActions} />
       ) : null}
       <p className="trending-source">趋势数据：AniList · 中文标题：Bangumi</p>
     </section>
@@ -76,17 +86,41 @@ function TrendingState({ data, compact = false }: { data: TrendingData; compact?
   );
 }
 
-function TrendingList({ anime, compact = false }: { anime: Anime[]; compact?: boolean }) {
+function TrendingList({
+  anime,
+  compact = false,
+  followActions
+}: {
+  anime: Anime[];
+  compact?: boolean;
+  followActions: FollowActions;
+}) {
   return (
     <ol className={`trending-list${compact ? " trending-list--compact" : ""}`}>
       {anime.map((item, index) => (
-        <TrendingRow anime={item} compact={compact} key={item.id} rank={index + 1} />
+        <TrendingRow
+          anime={item}
+          compact={compact}
+          followActions={followActions}
+          key={item.id}
+          rank={index + 1}
+        />
       ))}
     </ol>
   );
 }
 
-function TrendingRow({ anime, compact, rank }: { anime: Anime; compact: boolean; rank: number }) {
+function TrendingRow({
+  anime,
+  compact,
+  followActions,
+  rank
+}: {
+  anime: Anime;
+  compact: boolean;
+  followActions: FollowActions;
+  rank: number;
+}) {
   const title = getChineseAnimeDisplayTitle(anime);
   const metadata = getTrendingMetadata(anime);
   return (
@@ -104,6 +138,7 @@ function TrendingRow({ anime, compact, rank }: { anime: Anime; compact: boolean;
         <span>{metadata.summary}</span>
         {!compact && metadata.airing ? <small>{metadata.airing}</small> : null}
       </div>
+      <FollowAnimeButton actions={followActions} anime={anime} />
     </li>
   );
 }
