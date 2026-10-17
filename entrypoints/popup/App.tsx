@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from "../../domain/settings";
 import { CalendarView } from "../../features/calendar/CalendarView";
 import { MyAnimeView } from "../../features/following/MyAnimeView";
 import { UpcomingAnimeView } from "../../features/upcoming/UpcomingAnimeView";
+import { prefetchUpcoming } from "../../features/upcoming/prefetchUpcoming";
 import { TrendingPreview, TrendingView } from "../../features/trending/TrendingView";
 import { SettingsView } from "../../features/settings/SettingsView";
 import { DiscoveryView } from "../../features/discovery/DiscoveryView";
@@ -50,6 +51,7 @@ export function App() {
 
   useEffect(() => {
     void browser.runtime.sendMessage({ type: "popup-opened" }).catch(() => undefined);
+    void prefetchUpcoming(animeService).catch(() => undefined);
     void settingsService.getSettings()
       .then((settings) => setThemePreference(settings.themePreference))
       .catch(() => undefined);

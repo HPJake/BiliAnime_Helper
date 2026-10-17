@@ -60,7 +60,8 @@ type AniListMedia = {
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export class AniListProvider implements AnimeProvider {
-  private requestTail: Promise<void> = Promise.resolve();
+  private activeRequests = 0;
+  private readonly requestQueue: Array<() => void> = [];
   private blockedUntil = 0;
 
   constructor(
@@ -71,7 +72,7 @@ export class AniListProvider implements AnimeProvider {
     private readonly currentYear: () => number = () => new Date().getFullYear(),
     private readonly sleep: (milliseconds: number) => Promise<void> = wait,
     private readonly now: () => number = Date.now,
-    private readonly requestIntervalMs = typeof window === "undefined" ? 0 : 700
+    private readonly maxConcurrentRequests = 4
   ) {}
 
   async searchAnime(query: string, limit = 10): Promise<Anime[]> {
@@ -282,12 +283,7 @@ export class AniListProvider implements AnimeProvider {
   }
 
   private async fetch(query: string, variables: Record<string, unknown>): Promise<Response> {
-    const previous = this.requestTail;
-    let release: (() => void) | undefined;
-    this.requestTail = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await previous;
+    await this.acquireRequestSlot();
     try {
       const waitFor = this.blockedUntil - this.now();
       if (waitFor > 0) await this.sleep(waitFor);
@@ -301,14 +297,30 @@ export class AniListProvider implements AnimeProvider {
       } catch (error) {
         throw normalizeApiError(error, { offline: !this.isOnline() });
       }
-      const cooldown = response.status === 429
-        ? retryAfter(response) * 1000
-        : this.requestIntervalMs;
-      this.blockedUntil = Math.max(this.blockedUntil, this.now() + cooldown);
+      if (response.status === 429) {
+        this.blockedUntil = Math.max(
+          this.blockedUntil,
+          this.now() + retryAfter(response) * 1000
+        );
+      }
       return response;
     } finally {
-      release?.();
+      this.releaseRequestSlot();
     }
+  }
+
+  private acquireRequestSlot(): Promise<void> {
+    if (this.activeRequests < Math.max(1, Math.trunc(this.maxConcurrentRequests))) {
+      this.activeRequests += 1;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => this.requestQueue.push(resolve));
+  }
+
+  private releaseRequestSlot(): void {
+    const next = this.requestQueue.shift();
+    if (next) next();
+    else this.activeRequests -= 1;
   }
 }
 

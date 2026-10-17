@@ -80,16 +80,24 @@ export class LocalizedAnimeProvider implements AnimeProvider {
     season: AnimeSeason,
     seasonYear: number
   ): Promise<UpcomingAnimeSchedule> {
-    const schedule = await this.animeProvider.getUpcomingAnimeSchedule(
+    const scheduleRequest = this.animeProvider.getUpcomingAnimeSchedule(
       from,
       to,
       season,
       seasonYear
     );
-    const matches = await this.safeCalendarTitles();
+    const calendarTitlesRequest = this.safeCalendarTitles();
+    const schedule = await scheduleRequest;
+    const scheduledAnimeIds = new Set(schedule.events.map((event) => event.animeId));
+    const scheduledAnime = schedule.anime.filter((anime) => scheduledAnimeIds.has(anime.id));
+    if (scheduledAnime.length === 0) {
+      return { ...schedule, anime: [] };
+    }
+
+    const matches = await calendarTitlesRequest;
     return {
       ...schedule,
-      anime: await this.enrichMissingChineseTitles(schedule.anime, matches)
+      anime: await this.enrichMissingChineseTitles(scheduledAnime, matches)
     };
   }
 

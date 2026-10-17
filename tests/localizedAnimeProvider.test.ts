@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { UpcomingAnimeSchedule } from "../domain/airing";
 import type { AnimeProvider } from "../services/anime/AnimeProvider";
 import type { ChineseTitleProvider } from "../services/anime/BangumiTitleProvider";
 import {
@@ -83,6 +84,77 @@ describe("LocalizedAnimeProvider", () => {
     expect(schedule.events).toHaveLength(2);
     expect(chineseTitles.searchTitles).toHaveBeenCalledOnce();
     expect(chineseTitles.searchTitles).toHaveBeenCalledWith("ダンダダン", 5);
+  });
+
+  it("localizes only anime airing inside the requested upcoming window", async () => {
+    const anime = Array.from({ length: 30 }, (_, index) => ({
+      id: index + 1,
+      title: { native: `作品${index + 1}` },
+      synonyms: []
+    }));
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({
+        anime,
+        events: [
+          { animeId: 1, episode: 1, airingAt: 100 },
+          { animeId: 2, episode: 2, airingAt: 150 }
+        ]
+      })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async (query: string) => query === "作品2"
+        ? [{ native: "作品2", chinese: "作品二" }]
+        : []),
+      getCalendarTitles: vi.fn(async () => [
+        { native: "作品1", chinese: "作品一" }
+      ])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    const schedule = await provider.getUpcomingAnimeSchedule(0, 200, "FALL", 2026);
+
+    expect(schedule.anime.map((item) => item.id)).toEqual([1, 2]);
+    expect(schedule.anime.map((item) => item.title.chinese)).toEqual(["作品一", "作品二"]);
+    expect(chineseTitles.searchTitles).toHaveBeenCalledOnce();
+    expect(chineseTitles.searchTitles).toHaveBeenCalledWith("作品2", 5);
+  });
+
+  it("starts the Bangumi calendar request while the upcoming AniList schedule is loading", async () => {
+    let resolveSchedule: ((schedule: UpcomingAnimeSchedule) => void) | undefined;
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(() => new Promise<UpcomingAnimeSchedule>((resolve) => {
+        resolveSchedule = resolve;
+      })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => []),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    const request = provider.getUpcomingAnimeSchedule(0, 200, "FALL", 2026);
+    await vi.waitFor(() => expect(aniList.getUpcomingAnimeSchedule).toHaveBeenCalledOnce());
+
+    expect(chineseTitles.getCalendarTitles).toHaveBeenCalledOnce();
+    resolveSchedule?.({
+      anime: [{ id: 1, title: { native: "作品1" }, synonyms: [] }],
+      events: [{ animeId: 1, episode: 1, airingAt: 100 }]
+    });
+    await request;
   });
 
   it("enriches trending titles without changing AniList rank order", async () => {

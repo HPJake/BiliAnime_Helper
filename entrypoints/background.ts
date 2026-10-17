@@ -6,8 +6,10 @@ import { BangumiTitleProvider } from "../services/anime/BangumiTitleProvider";
 import { LocalizedAnimeProvider } from "../services/anime/LocalizedAnimeProvider";
 import {
   AiringNotificationScheduler,
+  REFRESH_ALARM_NAME,
   type NotificationPlatform
 } from "../services/notifications/AiringNotificationScheduler";
+import { prefetchUpcoming } from "../features/upcoming/prefetchUpcoming";
 import { browserStorageArea, createAppRepository } from "../storage/browserStorage";
 import { CacheRepository } from "../utils/cache";
 
@@ -49,6 +51,9 @@ export default defineBackground(() => {
 
   browser.alarms.onAlarm.addListener((alarm) => {
     void scheduler.handleAlarm(alarm.name).catch(reportBackgroundError);
+    if (alarm.name === REFRESH_ALARM_NAME) {
+      void prefetchUpcoming(animeService).catch(reportBackgroundError);
+    }
   });
   browser.notifications.onClicked.addListener((notificationId) => {
     void scheduler.handleNotificationClick(notificationId).catch(reportBackgroundError);
@@ -62,6 +67,7 @@ export default defineBackground(() => {
   });
 
   void scheduler.start().catch(reportBackgroundError);
+  void prefetchUpcoming(animeService).catch(reportBackgroundError);
 });
 
 function getMessageType(message: unknown): string | null {

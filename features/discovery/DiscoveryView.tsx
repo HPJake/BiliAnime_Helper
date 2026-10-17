@@ -191,31 +191,52 @@ function DiscoveryResults({
   const [hasNextPage, setHasNextPage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const filtersKey = serializeDiscoveryFilters(filters);
   const filtersKeyRef = useRef(filtersKey);
   filtersKeyRef.current = filtersKey;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    animeService.browseAnime(filters, 1, PAGE_SIZE)
-      .then((result) => {
+    async function load() {
+      setLoading(true);
+      setRefreshing(false);
+      setError(null);
+      setWarning(null);
+      const cached = await animeService.getCachedBrowseAnime(filters, 1, PAGE_SIZE);
+      if (cancelled) return;
+      if (cached) {
+        setAnime(cached.data.anime);
+        setPage(1);
+        setHasNextPage(cached.data.hasNextPage);
+        setLoading(false);
+        setRefreshing(true);
+      }
+      try {
+        const result = await animeService.browseAnime(filters, 1, PAGE_SIZE);
         if (cancelled) return;
         setAnime(result.data.anime);
         setPage(1);
         setHasNextPage(result.data.hasNextPage);
-      })
-      .catch((requestError) => {
-        if (!cancelled) {
+        setWarning(result.stale ? "在线数据暂时不可用，当前显示上次缓存结果。" : null);
+      } catch (requestError) {
+        if (cancelled) return;
+        if (cached) {
+          setWarning("在线刷新失败，当前继续显示上次缓存结果。");
+        } else {
           setAnime([]);
           setError(toUserMessage(requestError));
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    }
+    void load();
     return () => {
       cancelled = true;
     };
@@ -246,10 +267,11 @@ function DiscoveryResults({
     <section className="discovery-results" aria-labelledby="discovery-results-title">
       <div className="discovery-results__heading">
         <h3 id="discovery-results-title">筛选结果</h3>
-        {!loading && !error ? <span>已加载 {anime.length} 部</span> : null}
+        {refreshing ? <span>正在后台刷新…</span> : !loading && !error ? <span>已加载 {anime.length} 部</span> : null}
       </div>
       {loading ? <DiscoveryLoading /> : null}
       {error ? <StateMessage detail={error} title="暂时无法加载分类结果" tone="error" /> : null}
+      {warning ? <StateMessage detail={warning} title="正在使用缓存数据" tone="warning" /> : null}
       {!loading && !error && anime.length === 0 ? (
         <StateMessage detail="可以减少类型条件，或者换一个年代再试。" title="没有找到符合条件的作品" />
       ) : null}

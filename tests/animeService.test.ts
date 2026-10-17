@@ -104,6 +104,30 @@ describe("AnimeService", () => {
     expect(provider.getUpcomingAnimeSchedule).toHaveBeenCalledTimes(1);
   });
 
+  it("returns the latest overlapping upcoming snapshot immediately after the date range rolls forward", async () => {
+    const storage = new MemoryStorage();
+    const cache = new CacheRepository(storage, () => 1_000);
+    const provider = createProvider();
+    vi.mocked(provider.getUpcomingAnimeSchedule).mockResolvedValueOnce({
+      anime: [{ id: 1, title: { chinese: "缓存新番" }, synonyms: [] }],
+      events: [{ animeId: 1, episode: 1, airingAt: 250 }]
+    });
+    const service = new AnimeService(provider, cache, () => 1_000);
+
+    await service.getUpcomingAnimeSchedule(100, 700, "FALL", 2026);
+
+    await expect(service.getCachedUpcomingAnimeSchedule(200, 800, "FALL", 2026))
+      .resolves.toMatchObject({
+        source: "cache",
+        stale: true,
+        data: {
+          anime: [{ id: 1, title: { chinese: "缓存新番" } }],
+          events: [{ animeId: 1, episode: 1, airingAt: 250 }]
+        }
+      });
+    expect(provider.getUpcomingAnimeSchedule).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the 30-minute trending cache and falls back to stale rankings", async () => {
     let time = 1_000;
     const storage = new MemoryStorage();
@@ -171,6 +195,11 @@ describe("AnimeService", () => {
     };
 
     expect((await service.browseAnime(filters, 1)).source).toBe("network");
+    expect(await service.getCachedBrowseAnime(filters, 1)).toMatchObject({
+      source: "cache",
+      stale: false,
+      data: { page: 1, total: 1 }
+    });
     expect((await service.browseAnime({ ...filters, genres: ["Adventure", "Fantasy"] }, 1)).source)
       .toBe("cache");
     expect(provider.browseAnime).toHaveBeenCalledTimes(1);

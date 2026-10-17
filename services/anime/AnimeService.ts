@@ -11,9 +11,10 @@ import type { AnimeProvider } from "./AnimeProvider";
 export const CACHE_TTL = {
   metadata: 6 * 60 * 60 * 1000,
   airing: 30 * 60 * 1000,
+  upcomingSnapshot: 8 * 24 * 60 * 60 * 1000,
   trending: 30 * 60 * 1000,
   search: 5 * 60 * 1000,
-  discovery: 30 * 60 * 1000
+  discovery: 6 * 60 * 60 * 1000
 } as const;
 
 export type AnimeDataResult<T> = {
@@ -21,6 +22,16 @@ export type AnimeDataResult<T> = {
   source: "cache" | "network";
   stale: boolean;
 };
+
+type UpcomingSnapshot = {
+  data: UpcomingAnimeSchedule;
+  from: number;
+  season: AnimeSeason;
+  seasonYear: number;
+  to: number;
+};
+
+const LATEST_UPCOMING_CACHE_KEY = "upcoming:latest:v1";
 
 export class AnimeService {
   private readonly inFlight = new Map<string, Promise<AnimeDataResult<unknown>>>();
@@ -52,6 +63,15 @@ export class AnimeService {
     return this.load(key, CACHE_TTL.discovery, () =>
       this.provider.browseAnime(filters, page, perPage)
     );
+  }
+
+  getCachedBrowseAnime(
+    filters: DiscoveryFilters,
+    page: number,
+    perPage = 10
+  ): Promise<AnimeDataResult<DiscoveryPage> | null> {
+    const key = `discovery:v1:${serializeDiscoveryFilters(filters)}:${page}:${perPage}`;
+    return this.peek(key);
   }
 
   async getRandomAnime(
@@ -91,26 +111,53 @@ export class AnimeService {
     return this.peek(`airing:${animeId}:${from}:${to}`);
   }
 
-  getUpcomingAnimeSchedule(
+  async getUpcomingAnimeSchedule(
     from: number,
     to: number,
     season: AnimeSeason,
     seasonYear: number
   ): Promise<AnimeDataResult<UpcomingAnimeSchedule>> {
-    return this.load(
+    const result = await this.load(
       `upcoming:v2:${season}:${seasonYear}:${from}:${to}`,
       CACHE_TTL.airing,
       () => this.provider.getUpcomingAnimeSchedule(from, to, season, seasonYear)
     );
+    await this.cache.set<UpcomingSnapshot>(LATEST_UPCOMING_CACHE_KEY, {
+      data: result.data,
+      from,
+      season,
+      seasonYear,
+      to
+    }, CACHE_TTL.upcomingSnapshot);
+    return result;
   }
 
-  getCachedUpcomingAnimeSchedule(
+  async getCachedUpcomingAnimeSchedule(
     from: number,
     to: number,
     season: AnimeSeason,
     seasonYear: number
   ): Promise<AnimeDataResult<UpcomingAnimeSchedule> | null> {
-    return this.peek(`upcoming:v2:${season}:${seasonYear}:${from}:${to}`);
+    const exact = await this.peek<UpcomingAnimeSchedule>(
+      `upcoming:v2:${season}:${seasonYear}:${from}:${to}`
+    );
+    if (exact) return exact;
+
+    const latest = await this.cache.get<UpcomingSnapshot>(LATEST_UPCOMING_CACHE_KEY);
+    if (
+      !latest ||
+      latest.value.season !== season ||
+      latest.value.seasonYear !== seasonYear ||
+      latest.value.to <= from ||
+      latest.value.from >= to
+    ) {
+      return null;
+    }
+    return {
+      data: latest.value.data,
+      source: "cache",
+      stale: true
+    };
   }
 
   getTrending(limit = 20): Promise<AnimeDataResult<Anime[]>> {

@@ -194,13 +194,33 @@ describe("AniListProvider", () => {
       () => 2026,
       sleep,
       () => currentTime,
-      0
+      4
     );
 
     await expect(provider.browseAnime({
       era: "ALL", format: "ALL", genres: [], sort: "POPULARITY"
     }, 1)).resolves.toMatchObject({ anime: [] });
     expect(sleep).toHaveBeenCalledWith(3_000);
+  });
+
+  it("runs four metadata requests concurrently and queues only the fifth", async () => {
+    const resolveResponses: Array<(response: Response) => void> = [];
+    const fetcher = vi.fn(() => new Promise<Response>((resolve) => {
+      resolveResponses.push(resolve);
+    }));
+    const provider = new AniListProvider(fetcher);
+    const requests = [1, 2, 3, 4, 5].map((id) => provider.getAnime(id));
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
+    resolveResponses[0](Response.json({
+      data: { Media: { id: 1, title: { romaji: "Anime 1" } } }
+    }));
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(5));
+    resolveResponses.slice(1).forEach((resolve, index) => resolve(Response.json({
+      data: { Media: { id: index + 2, title: { romaji: `Anime ${index + 2}` } } }
+    })));
+
+    await expect(Promise.all(requests)).resolves.toHaveLength(5);
   });
 
   it("returns the AniList trending order and filters adult results", async () => {
