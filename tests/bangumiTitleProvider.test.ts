@@ -12,6 +12,8 @@ describe("BangumiTitleProvider", () => {
           {
             name: "薬屋のひとりごと",
             name_cn: "药屋少女的呢喃",
+            date: "2023-10-22",
+            infobox: [{ key: "别名", value: [{ v: "药师少女的独语" }] }],
             summary: "宫廷中的推理故事。",
             rating: { score: 8.2 },
             type: 2
@@ -26,6 +28,8 @@ describe("BangumiTitleProvider", () => {
       {
         native: "薬屋のひとりごと",
         chinese: "药屋少女的呢喃",
+        aliases: ["药师少女的独语"],
+        releaseDate: "2023-10-22",
         summary: "宫廷中的推理故事。",
         score: 8.2
       },

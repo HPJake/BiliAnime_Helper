@@ -63,7 +63,7 @@ describe("AnimeService", () => {
     const service = new AnimeService(provider, cache, () => time);
 
     expect((await service.searchAnime(" Result ")).source).toBe("network");
-    expect((await cache.get("search:v2:result:10"))?.expiresAt).toBe(time + CACHE_TTL.search);
+    expect((await cache.get("search:v5:result:10"))?.expiresAt).toBe(time + CACHE_TTL.search);
 
     time += 100;
     expect((await service.searchAnime("result")).source).toBe("cache");

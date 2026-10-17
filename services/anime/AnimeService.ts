@@ -45,7 +45,7 @@ export class AnimeService {
   searchAnime(query: string, limit = 10): Promise<AnimeDataResult<Anime[]>> {
     const normalized = query.trim().toLocaleLowerCase();
     if (!normalized) return Promise.resolve({ data: [], source: "cache", stale: false });
-    return this.load(`search:v2:${normalized}:${limit}`, CACHE_TTL.search, () =>
+    return this.load(`search:v5:${normalized}:${limit}`, CACHE_TTL.search, () =>
       this.provider.searchAnime(query.trim(), limit)
     );
   }

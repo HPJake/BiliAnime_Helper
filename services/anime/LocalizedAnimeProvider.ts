@@ -5,6 +5,7 @@ import type { AnimeProvider } from "./AnimeProvider";
 import type { ChineseTitleMatch, ChineseTitleProvider } from "./BangumiTitleProvider";
 
 const TITLE_LOOKUP_CONCURRENCY = 4;
+const SEARCH_EXPANSION_LIMIT = 2;
 
 export class LocalizedAnimeProvider implements AnimeProvider {
   private readonly chineseTitleLookups = new Map<string, Promise<ChineseTitleMatch | null>>();
@@ -15,20 +16,40 @@ export class LocalizedAnimeProvider implements AnimeProvider {
   ) {}
 
   async searchAnime(query: string, limit = 10): Promise<Anime[]> {
+    const directRequest = settle(this.animeProvider.searchAnime(query, limit));
     const matches = await this.safeSearchTitles(query, Math.max(limit, 10));
-    const expandedQuery = matches[0]?.native;
-    const requests = [this.animeProvider.searchAnime(query, limit)];
-    if (expandedQuery && normalize(expandedQuery) !== normalize(query)) {
-      requests.push(this.animeProvider.searchAnime(expandedQuery, Math.max(limit, 20)));
+    const expandedQueries = rankChineseTitleMatches(query, matches)
+      .map((match) => match.native)
+      .filter((expandedQuery, index, queries) =>
+        normalize(expandedQuery) !== normalize(query) &&
+        queries.findIndex((candidate) => normalize(candidate) === normalize(expandedQuery)) === index
+      )
+      .slice(0, SEARCH_EXPANSION_LIMIT);
+    const settledRequests: Array<PromiseSettledResult<Anime[]>> = [];
+    const primaryExpandedQuery = expandedQueries[0];
+    if (primaryExpandedQuery) {
+      const [directResult, expandedResult] = await Promise.all([
+        directRequest,
+        settle(this.animeProvider.searchAnime(primaryExpandedQuery, Math.max(limit, 20)))
+      ]);
+      settledRequests.push(directResult, expandedResult);
+      const fallbackExpandedQuery = expandedQueries[1];
+      if (!hasAnimeResults(expandedResult) && fallbackExpandedQuery) {
+        settledRequests.push(await settle(
+          this.animeProvider.searchAnime(fallbackExpandedQuery, Math.max(limit, 20))
+        ));
+      }
+    } else {
+      settledRequests.push(await directRequest);
     }
-    const settled = await Promise.allSettled(requests);
-    const successful = settled
-      .filter((result): result is PromiseFulfilledResult<Anime[]> => result.status === "fulfilled")
-      .flatMap((result) => result.value);
-    if (successful.length === 0) {
-      const failure = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    const fulfilled = settledRequests
+      .filter((result): result is PromiseFulfilledResult<Anime[]> => result.status === "fulfilled");
+    if (fulfilled.length === 0) {
+      const failure = settledRequests
+        .find((result): result is PromiseRejectedResult => result.status === "rejected");
       throw failure?.reason ?? new Error("动画搜索失败");
     }
+    const successful = fulfilled.flatMap((result) => result.value);
     return sortAnimeByNewestSeason(enrichAndDedupe(successful, matches))
       .slice(0, Math.max(limit, 20));
   }
@@ -157,8 +178,7 @@ export class LocalizedAnimeProvider implements AnimeProvider {
     const existing = this.chineseTitleLookups.get(key);
     if (existing) return existing;
     const lookup = this.safeSearchTitles(query, 5).then((candidates) => {
-      const exact = candidates.find((candidate) => normalize(candidate.native) === key);
-      return exact ?? candidates[0] ?? null;
+      return rankChineseTitleMatches(query, candidates)[0] ?? null;
     });
     this.chineseTitleLookups.set(key, lookup);
     return lookup;
@@ -182,22 +202,113 @@ export class LocalizedAnimeProvider implements AnimeProvider {
   }
 }
 
+function settle<T>(request: Promise<T>): Promise<PromiseSettledResult<T>> {
+  return request.then(
+    (value) => ({ status: "fulfilled", value }),
+    (reason: unknown) => ({ status: "rejected", reason })
+  );
+}
+
+function hasAnimeResults(result: PromiseSettledResult<Anime[]>): boolean {
+  return result.status === "fulfilled" && result.value.length > 0;
+}
+
+function rankChineseTitleMatches(
+  query: string,
+  matches: ChineseTitleMatch[]
+): ChineseTitleMatch[] {
+  const normalizedQuery = normalize(query);
+  return matches
+    .map((match, index) => ({ match, index }))
+    .sort((left, right) => {
+      const exactDifference = Number(matchesQuery(right.match, normalizedQuery))
+        - Number(matchesQuery(left.match, normalizedQuery));
+      if (exactDifference !== 0) return exactDifference;
+      const dateDifference = releaseTime(right.match.releaseDate) - releaseTime(left.match.releaseDate);
+      return dateDifference || left.index - right.index;
+    })
+    .map(({ match }) => match);
+}
+
+function matchesQuery(match: ChineseTitleMatch, normalizedQuery: string): boolean {
+  return [match.native, match.chinese, ...(match.aliases ?? [])]
+    .some((title) => normalize(title) === normalizedQuery);
+}
+
+function releaseTime(value: string | undefined): number {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function enrichAndDedupe(anime: Anime[], matches: ChineseTitleMatch[]): Anime[] {
-  const unique = new Map<number, Anime>();
-  for (const item of anime) unique.set(item.id, enrichAnime(item, matches));
+  const unique = new Map<string, Anime>();
+  for (const item of anime) {
+    const match = findChineseMatch(item, matches);
+    const localized = match ? applyChineseMatch(item, match) : item;
+    const key = match && isExactChineseMatch(item, match)
+      ? `title:${normalize(match.native)}`
+      : `id:${item.id}`;
+    const existing = unique.get(key);
+    unique.set(key, existing ? mergeAnimeRecords(existing, localized) : localized);
+  }
   return [...unique.values()];
 }
 
-function enrichAnime(anime: Anime, matches: ChineseTitleMatch[]): Anime {
-  const native = anime.title.native && normalize(anime.title.native);
-  const match = native ? matches.find((candidate) => normalize(candidate.native) === native) : undefined;
-  return match ? applyChineseMatch(anime, match) : anime;
+function findChineseMatch(
+  anime: Anime,
+  matches: ChineseTitleMatch[]
+): ChineseTitleMatch | undefined {
+  const animeTitles = [
+    anime.title.native,
+    anime.title.romaji,
+    anime.title.english,
+    anime.title.chinese,
+    ...anime.synonyms
+  ]
+    .filter((title): title is string => typeof title === "string" && title.trim().length > 0)
+    .map(normalize);
+  const exact = matches.find((match) => isExactChineseMatch(anime, match));
+  if (exact) return exact;
+
+  return matches
+    .flatMap((match, index) => [match.native, match.chinese, ...(match.aliases ?? [])]
+      .map(normalize)
+      .filter((matchTitle) => matchTitle.length >= 8 &&
+        animeTitles.some((animeTitle) => animeTitle.startsWith(matchTitle)))
+      .map((matchedTitle) => ({ match, index, matchedTitle })))
+    .sort((left, right) => right.matchedTitle.length - left.matchedTitle.length || left.index - right.index)[0]
+    ?.match;
+}
+
+function isExactChineseMatch(anime: Anime, match: ChineseTitleMatch): boolean {
+  const matchTitles = new Set([match.native, match.chinese, ...(match.aliases ?? [])].map(normalize));
+  return [anime.title.native, anime.title.romaji, anime.title.english, anime.title.chinese, ...anime.synonyms]
+    .some((title) => typeof title === "string" && matchTitles.has(normalize(title)));
+}
+
+function mergeAnimeRecords(existing: Anime, incoming: Anime): Anime {
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    title: { ...incoming.title, ...existing.title },
+    synonyms: [...new Set([...existing.synonyms, ...incoming.synonyms])]
+  };
 }
 
 function applyChineseMatch(anime: Anime, match: ChineseTitleMatch): Anime {
+  const inheritedSuffix = isExactChineseMatch(anime, match)
+    ? ""
+    : anime.format === "SPECIAL"
+      ? " 特别篇"
+      : anime.format === "OVA"
+        ? " OVA"
+        : "";
   return {
     ...anime,
-    title: { ...anime.title, chinese: match.chinese },
+    title: { ...anime.title, chinese: `${match.chinese}${inheritedSuffix}` },
+    synonyms: [...new Set([...anime.synonyms, ...(match.aliases ?? [])])],
     ...(match.summary ? { description: match.summary } : {}),
     ...(match.score !== undefined
       ? { averageScore: match.score * 10, scoreSource: "Bangumi" as const }

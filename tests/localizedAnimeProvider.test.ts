@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { UpcomingAnimeSchedule } from "../domain/airing";
 import type { AnimeProvider } from "../services/anime/AnimeProvider";
-import type { ChineseTitleProvider } from "../services/anime/BangumiTitleProvider";
+import type {
+  ChineseTitleMatch,
+  ChineseTitleProvider
+} from "../services/anime/BangumiTitleProvider";
 import {
   LocalizedAnimeProvider,
   sortAnimeByNewestSeason
@@ -43,6 +46,211 @@ describe("LocalizedAnimeProvider", () => {
       [195516, "药屋少女的呢喃 第三季"]
     ]);
     expect(aniList.searchAnime).toHaveBeenCalledWith("薬屋のひとりごと", 20);
+  });
+
+  it("finds a recent anime through either its primary Chinese title or an alternate translation", async () => {
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
+      searchAnime: vi.fn(async (query: string) => query === "生徒会にも穴はある！"
+        ? [{
+            id: 190000,
+            title: { native: "生徒会にも穴はある！" },
+            synonyms: ["Even the Student Council Has Its Holes!"],
+            season: "FALL",
+            seasonYear: 2026
+          }]
+        : []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => [
+        {
+          native: "生徒会にも穴はある！アニメCM",
+          chinese: "学生会也有洞！动画CM",
+          aliases: ["脑洞学生会 动画CM"],
+          releaseDate: "2024-07-10"
+        },
+        {
+          native: "生徒会にも穴はある！",
+          chinese: "学生会也有洞！",
+          aliases: ["脑洞学生会！"],
+          releaseDate: "2026-10-03"
+        }
+      ]),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    for (const query of ["学生会也有洞", "脑洞学生会", "学生会"]) {
+      await expect(provider.searchAnime(query, 10)).resolves.toMatchObject([
+        {
+          id: 190000,
+          title: { chinese: "学生会也有洞！" },
+          season: "FALL",
+          seasonYear: 2026
+        }
+      ]);
+    }
+    expect(aniList.searchAnime).toHaveBeenCalledWith("生徒会にも穴はある！", 20);
+    expect(aniList.searchAnime).toHaveBeenCalledTimes(6);
+  });
+
+  it("merges Chinese and Japanese search records that resolve to the same title match", async () => {
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
+      searchAnime: vi.fn(async (query: string) => query === "学生会也有洞"
+        ? [{
+            id: 100,
+            title: { native: "生徒会にも穴はある！" },
+            synonyms: [],
+            season: "FALL",
+            seasonYear: 2026
+          }]
+        : [{
+            id: 200,
+            title: { romaji: "Seitokai ni mo Ana wa Aru!" },
+            synonyms: ["生徒会にも穴はある！"],
+            season: "FALL",
+            seasonYear: 2026
+          }]),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => [{
+        native: "生徒会にも穴はある！",
+        chinese: "学生会也有洞！",
+        aliases: ["脑洞学生会！", "Seitokai ni mo Ana wa Aru!"],
+        releaseDate: "2026-10-03"
+      }]),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+
+    const results = await new LocalizedAnimeProvider(aniList, chineseTitles)
+      .searchAnime("学生会也有洞", 10);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      id: 100,
+      title: { chinese: "学生会也有洞！" },
+      season: "FALL",
+      seasonYear: 2026
+    });
+  });
+
+  it("localizes related special entries from the closest Chinese season title without merging them", async () => {
+    const animeEntries = [
+      {
+        id: 104462,
+        title: {
+          native: "とある科学の超電磁砲T",
+          romaji: "Toaru Kagaku no Railgun T"
+        },
+        synonyms: [],
+        format: "TV",
+        season: "WINTER",
+        seasonYear: 2020
+      },
+      {
+        id: 122041,
+        title: {
+          native: "とある科学の超電磁砲T もっとまるっと超電磁砲",
+          romaji: "Toaru Kagaku no Railgun T: Motto Marutto Railgun"
+        },
+        synonyms: ["Motto Marutto Railgun V", "Motto Marutto Railgun VI"],
+        format: "SPECIAL",
+        season: "SPRING",
+        seasonYear: 2020
+      },
+      {
+        id: 9047,
+        title: {
+          native: "とある科学の超電磁砲 御坂さんはいま注目の的ですから",
+          romaji: "Toaru Kagaku no Railgun: Misaka-san wa Ima Chuumoku no Mato Desukara"
+        },
+        synonyms: ["Toaru Kagaku no Railgun OVA"],
+        format: "OVA",
+        season: "FALL",
+        seasonYear: 2010
+      }
+    ];
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
+      searchAnime: vi.fn(async () => animeEntries),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(async () => [
+        {
+          native: "とある科学の超電磁砲T",
+          chinese: "某科学的超电磁炮T",
+          aliases: ["Toaru Kagaku no Railgun T"]
+        },
+        {
+          native: "とある科学の超電磁砲",
+          chinese: "某科学的超电磁炮",
+          aliases: ["Toaru Kagaku no Railgun"]
+        }
+      ]),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+
+    const results = await new LocalizedAnimeProvider(aniList, chineseTitles)
+      .searchAnime("某科学的超电磁炮", 10);
+
+    expect(results).toHaveLength(3);
+    expect(results.map((anime) => anime.title.chinese)).toEqual([
+      "某科学的超电磁炮T 特别篇",
+      "某科学的超电磁炮T",
+      "某科学的超电磁炮 OVA"
+    ]);
+    expect(results.map((anime) => anime.id)).toEqual([122041, 104462, 9047]);
+  });
+
+  it("starts direct search immediately and limits translated-title fan-out", async () => {
+    let resolveTitles: ((matches: ChineseTitleMatch[]) => void) | undefined;
+    const aniList: AnimeProvider = {
+      browseAnime: vi.fn(async (_filters, page: number) => ({ anime: [], hasNextPage: false, page, total: 0 })),
+      searchAnime: vi.fn(async () => []),
+      getAnime: vi.fn(async () => null),
+      getAnimeSeries: vi.fn(async () => []),
+      getAiringSchedule: vi.fn(async () => []),
+      getUpcomingAnimeSchedule: vi.fn(async () => ({ anime: [], events: [] })),
+      getTrending: vi.fn(async () => []),
+      getRandomAnime: vi.fn(async () => null)
+    };
+    const chineseTitles: ChineseTitleProvider = {
+      searchTitles: vi.fn(() => new Promise<ChineseTitleMatch[]>((resolve) => {
+        resolveTitles = resolve;
+      })),
+      getCalendarTitles: vi.fn(async () => [])
+    };
+    const provider = new LocalizedAnimeProvider(aniList, chineseTitles);
+
+    const request = provider.searchAnime("学生会", 10);
+    await vi.waitFor(() => expect(aniList.searchAnime).toHaveBeenCalledWith("学生会", 10));
+    resolveTitles?.(Array.from({ length: 8 }, (_, index) => ({
+      native: `候选${index + 1}`,
+      chinese: `候选中文${index + 1}`,
+      releaseDate: `${2026 - index}-10-01`
+    })));
+    await request;
+
+    expect(aniList.searchAnime).toHaveBeenCalledTimes(3);
   });
 
   it("enriches the global weekly schedule from the Bangumi calendar", async () => {

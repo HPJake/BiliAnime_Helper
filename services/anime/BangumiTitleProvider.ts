@@ -1,6 +1,8 @@
 export type ChineseTitleMatch = {
+  aliases?: string[];
   native: string;
   chinese: string;
+  releaseDate?: string;
   score?: number;
   summary?: string;
 };
@@ -58,6 +60,8 @@ function mapTitleMatches(items: unknown[]): ChineseTitleMatch[] {
     if (!isRecord(item) || typeof item.name !== "string" || typeof item.name_cn !== "string") continue;
     const native = item.name.trim();
     const chinese = item.name_cn.trim();
+    const aliases = readAliases(item.infobox);
+    const releaseDate = typeof item.date === "string" ? item.date.trim() : "";
     const summary = typeof item.summary === "string" ? item.summary.trim() : "";
     const rating = isRecord(item.rating) && isFiniteNumber(item.rating.score)
       ? item.rating.score
@@ -66,12 +70,32 @@ function mapTitleMatches(items: unknown[]): ChineseTitleMatch[] {
       matches.set(normalize(native), {
         native,
         chinese,
+        ...(aliases.length > 0 ? { aliases } : {}),
+        ...(releaseDate ? { releaseDate } : {}),
         ...(summary ? { summary } : {}),
         ...(rating !== null && rating > 0 ? { score: rating } : {})
       });
     }
   }
   return [...matches.values()];
+}
+
+function readAliases(infobox: unknown): string[] {
+  if (!Array.isArray(infobox)) return [];
+  const aliases = new Set<string>();
+  for (const entry of infobox) {
+    if (!isRecord(entry) || entry.key !== "别名") continue;
+    const values = Array.isArray(entry.value) ? entry.value : [entry.value];
+    for (const value of values) {
+      const alias = typeof value === "string"
+        ? value.trim()
+        : isRecord(value) && typeof value.v === "string"
+          ? value.v.trim()
+          : "";
+      if (alias) aliases.add(alias);
+    }
+  }
+  return [...aliases];
 }
 
 function clampLimit(limit: number): number {
