@@ -1,3 +1,4 @@
+import { AutoParachute } from "../parachute/AutoParachute";
 import {
   calculateRotationScale,
   createRotationTransform,
@@ -64,6 +65,7 @@ function mutationAffectsVideo(record: MutationRecord): boolean {
 }
 
 export class VideoRotationFeature {
+  private readonly parachute = new AutoParachute();
   private video: HTMLVideoElement | null = null;
   private savedStyles: SavedVideoStyles | null = null;
   private rotation: Rotation = 0;
@@ -92,6 +94,7 @@ export class VideoRotationFeature {
   }
 
   start(): void {
+    this.parachute.start();
     document.documentElement.append(this.host);
     this.mutationObserver.observe(document.documentElement, {
       attributes: true,
@@ -106,6 +109,7 @@ export class VideoRotationFeature {
   }
 
   stop(): void {
+    this.parachute.stop();
     this.mutationObserver.disconnect();
     this.resizeObserver.disconnect();
     window.removeEventListener("resize", this.scheduleLayout);
@@ -142,6 +146,7 @@ export class VideoRotationFeature {
   private scanForVideo(): void {
     const candidate = findPrimaryVideo();
     if (candidate === this.video) {
+      this.parachute.update();
       this.positionToolbar();
       return;
     }
@@ -152,6 +157,7 @@ export class VideoRotationFeature {
 
   private attachVideo(video: HTMLVideoElement): void {
     this.video = video;
+    this.parachute.attach(video);
     this.savedStyles = saveVideoStyles(video);
     this.resizeObserver.observe(video);
     if (video.parentElement) this.resizeObserver.observe(video.parentElement);
@@ -160,6 +166,7 @@ export class VideoRotationFeature {
   }
 
   private detachVideo(): void {
+    this.parachute.attach(null);
     if (this.video && this.savedStyles) restoreVideoStyles(this.video, this.savedStyles);
     this.resizeObserver.disconnect();
     this.video = null;
@@ -272,6 +279,7 @@ export class VideoRotationFeature {
       button:hover { background: rgba(255, 255, 255, .14); }
       button:focus-visible { outline: 2px solid #00aeec; outline-offset: 1px; }
       button[aria-pressed="true"] { color: white; background: #00aeec; }
+      button:disabled { color: #999; background: transparent; cursor: not-allowed; }
       .angle {
         min-width: 28px;
         padding: 0 4px;
@@ -283,7 +291,8 @@ export class VideoRotationFeature {
     const toolbar = document.createElement("div");
     toolbar.className = "toolbar";
     toolbar.setAttribute("role", "group");
-    toolbar.setAttribute("aria-label", "Rotate video");
+    toolbar.setAttribute("aria-label", "跳伞和旋转控件");
+    toolbar.append(this.parachute.button);
 
     const controls: Array<{
       key: "quarter" | "half" | "reset";

@@ -20,6 +20,7 @@ pnpm build
 ```
 
 To load a production build, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `.output/chrome-mv3`.
+After changing source files, run `pnpm build` again, click the extension's reload button on `chrome://extensions`, then reopen its popup. Refreshing the popup alone does not load a new production bundle.
 
 ## Architecture
 

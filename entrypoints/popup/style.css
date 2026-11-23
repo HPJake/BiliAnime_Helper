@@ -89,7 +89,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .app-header { display: flex; align-items: center; gap: 10px; min-height: 70px; padding: 14px 0 10px; }
 .app-header__copy { min-width: 0; flex: 1; }
 .app-header h1 { margin: 0; font-size: 18px; line-height: 1.2; letter-spacing: -.01em; }
-.app-header p { margin: 3px 0 0; color: var(--quiet); font-size: 10px; }
+.app-header__phrase { display: -webkit-box; overflow: hidden; min-height: 28px; margin: 3px 0 0; color: var(--quiet); font-size: 10px; line-height: 14px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; animation: header-phrase-enter .2s ease-out; }
+@keyframes header-phrase-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .app-header__phrase { animation: none; } }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; color: white; background: linear-gradient(145deg, var(--primary), #32c5ff); font-weight: 850; box-shadow: 0 6px 16px rgba(0, 174, 236, .22); }
 .settings-button { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border: 1px solid var(--line); border-radius: 10px; padding: 7px; color: var(--muted); background: var(--surface); cursor: pointer; box-shadow: 0 3px 10px var(--shadow); transition: border-color .15s ease, color .15s ease, background .15s ease; }
 .settings-button:hover, .settings-button[aria-pressed="true"] { border-color: var(--line-primary); color: var(--primary); background: var(--primary-soft); }

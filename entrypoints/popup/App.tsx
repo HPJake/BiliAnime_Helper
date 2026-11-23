@@ -13,6 +13,11 @@ import {
   getKeyboardTab,
   type DashboardTab
 } from "../../features/dashboard/navigation";
+import {
+  createHeaderPhraseRotation,
+  HEADER_GREETING_DURATION_MS,
+  HEADER_PHRASE_INTERVAL_MS
+} from "../../features/dashboard/headerPhraseRotation";
 import { AniListProvider } from "../../services/anime/AniListProvider";
 import { AnimeService } from "../../services/anime/AnimeService";
 import { BangumiTitleProvider } from "../../services/anime/BangumiTitleProvider";
@@ -42,12 +47,28 @@ const settingsService = new SettingsService(
 );
 
 export function App() {
+  const [headerPhraseRotation] = useState(() => createHeaderPhraseRotation());
+  const [headerPhrase, setHeaderPhrase] = useState(headerPhraseRotation.first);
   const [activeTab, setActiveTab] = useState<DashboardTab>("today");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(
     DEFAULT_SETTINGS.themePreference
   );
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
+
+  useEffect(() => {
+    let interval: number | undefined;
+    const greetingTimer = window.setTimeout(() => {
+      setHeaderPhrase(headerPhraseRotation.next());
+      interval = window.setInterval(() => {
+        setHeaderPhrase(headerPhraseRotation.next());
+      }, HEADER_PHRASE_INTERVAL_MS);
+    }, HEADER_GREETING_DURATION_MS);
+    return () => {
+      window.clearTimeout(greetingTimer);
+      if (interval !== undefined) window.clearInterval(interval);
+    };
+  }, [headerPhraseRotation]);
 
   useEffect(() => {
     void browser.runtime.sendMessage({ type: "popup-opened" }).catch(() => undefined);
@@ -142,7 +163,9 @@ export function App() {
         <span className="brand-mark" aria-hidden="true">B</span>
         <div className="app-header__copy">
           <h1>BiliAnime Helper</h1>
-          <p>你的本地追番仪表盘</p>
+          <p key={headerPhrase.text} className="app-header__phrase" title={headerPhrase.text}>
+            {headerPhrase.text}
+          </p>
         </div>
         <button
           aria-controls="panel-settings"
