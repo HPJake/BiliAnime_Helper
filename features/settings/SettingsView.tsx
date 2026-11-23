@@ -25,7 +25,7 @@ export function SettingsView({
 }: SettingsViewProps) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"notifications" | "badge" | "theme" | "refresh" | "cache" | null>(null);
+  const [busy, setBusy] = useState<"launcher" | "notifications" | "badge" | "theme" | "refresh" | "cache" | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   useEffect(() => {
@@ -50,9 +50,9 @@ export function SettingsView({
   }, [service]);
 
   async function updateSetting(
-    key: "notificationsEnabled" | "badgeEnabled",
+    key: "notificationsEnabled" | "badgeEnabled" | "launcherEnabled" | "glassEnabled",
     value: boolean,
-    busyKey: "notifications" | "badge"
+    busyKey: "notifications" | "badge" | "launcher"
   ) {
     const previous = settings;
     setBusy(busyKey);
@@ -153,6 +153,15 @@ export function SettingsView({
             </label>
           ))}
         </div>
+      </section>
+
+      <section className="settings-card" aria-label="页内面板">
+        <ToggleRow checked={settings.launcherEnabled} disabled={loading || busy !== null}
+          label="B 站悬浮球" description="在页面右侧打开助手，可拖动调整高度。"
+          onChange={(checked) => void updateSetting("launcherEnabled", checked, "launcher")} />
+        <ToggleRow checked={settings.glassEnabled} disabled={loading || busy !== null}
+          label="面板毛玻璃" description="轻微模糊页内面板后方的画面。"
+          onChange={(checked) => void updateSetting("glassEnabled", checked, "launcher")} />
       </section>
 
       <section className="settings-card" aria-labelledby="notifications-settings-title">

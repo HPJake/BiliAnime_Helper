@@ -31,7 +31,7 @@ export default defineBackground(() => {
     clearAlarm: (name) => browser.alarms.clear(name),
     createNotification: (id, title, message) => browser.notifications.create(id, {
       type: "basic",
-      iconUrl: browser.runtime.getURL("/icon-128.svg"),
+      iconUrl: browser.runtime.getURL("/icon-128.png"),
       title,
       message
     }),

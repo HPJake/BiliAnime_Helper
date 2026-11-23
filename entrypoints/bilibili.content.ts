@@ -1,12 +1,14 @@
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { browser } from "wxt/browser";
 import { VideoRotationFeature } from "../features/rotation/videoRotation";
+import { startFloatingLauncher } from "../features/dashboard/floatingLauncher";
 import { detectBilibiliTheme } from "../features/theme/theme";
 
 export default defineContentScript({
   matches: ["*://*.bilibili.com/*"],
   runAt: "document_idle",
   main(ctx) {
+    const stopLauncher = startFloatingLauncher();
     const rotationFeature = isVideoPage(location.pathname) ? new VideoRotationFeature() : null;
     rotationFeature?.start();
 
@@ -16,6 +18,7 @@ export default defineContentScript({
     };
     browser.runtime.onMessage.addListener(handleMessage);
     ctx.onInvalidated(() => {
+      stopLauncher();
       rotationFeature?.stop();
       browser.runtime.onMessage.removeListener(handleMessage);
     });

@@ -58,6 +58,8 @@ function migrateScheduledEvents(value: unknown): ScheduledAiringEvent[] {
 function migrateSettings(value: unknown) {
   const stored = isRecord(value) ? value : {};
   return {
+    launcherEnabled: stored.launcherEnabled !== false,
+    glassEnabled: stored.glassEnabled !== false,
     notificationsEnabled:
       typeof stored.notificationsEnabled === "boolean"
         ? stored.notificationsEnabled

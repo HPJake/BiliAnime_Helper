@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Anime } from "../domain/anime";
-import type { ScheduledAiringEvent } from "../domain/settings";
+import { DEFAULT_SETTINGS, type ScheduledAiringEvent } from "../domain/settings";
 import type { AnimeDataResult } from "../services/anime/AnimeService";
 import {
   AiringNotificationScheduler,
@@ -140,6 +140,7 @@ describe("AiringNotificationScheduler", () => {
     const repository = new AppRepository(new MemoryStorage(), () => NOW_MS);
     await repository.followAnime(10);
     await repository.saveSettings({
+      ...DEFAULT_SETTINGS,
       notificationsEnabled: false,
       badgeEnabled: true,
       themePreference: "auto",
@@ -172,12 +173,12 @@ describe("AiringNotificationScheduler", () => {
     const repository = new AppRepository(new MemoryStorage(), () => NOW_MS);
     const id = createAiringEventId(scheduledEvent());
     await repository.saveNotificationState({ notifiedEventIds: [id], unseenEventIds: [id] });
-    await repository.saveSettings({ notificationsEnabled: true, badgeEnabled: false, themePreference: "auto", timezoneMode: "local" });
+    await repository.saveSettings({ ...DEFAULT_SETTINGS, badgeEnabled: false });
     const platform = new MemoryPlatform();
     const scheduler = new AiringNotificationScheduler(repository, animeService(), platform, () => NOW_MS);
 
     await scheduler.applySettings();
-    await repository.saveSettings({ notificationsEnabled: true, badgeEnabled: true, themePreference: "auto", timezoneMode: "local" });
+    await repository.saveSettings(DEFAULT_SETTINGS);
     await scheduler.applySettings();
 
     expect(platform.badgeTexts).toEqual(["", "1"]);

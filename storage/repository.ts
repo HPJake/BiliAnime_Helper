@@ -81,6 +81,8 @@ export class AppRepository {
     const value = stored[STORAGE_KEYS.settings];
     if (!isRecord(value)) return { ...DEFAULT_SETTINGS };
     return {
+      launcherEnabled: value.launcherEnabled !== false,
+      glassEnabled: value.glassEnabled !== false,
       notificationsEnabled:
         typeof value.notificationsEnabled === "boolean"
           ? value.notificationsEnabled

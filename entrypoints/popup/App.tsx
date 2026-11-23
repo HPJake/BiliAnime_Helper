@@ -160,7 +160,7 @@ export function App() {
   return (
     <main className="popup-shell">
       <header className="app-header">
-        <span className="brand-mark" aria-hidden="true">B</span>
+        <img src="/icon-128.png" width="34" height="34" alt="" />
         <div className="app-header__copy">
           <h1>BiliAnime Helper</h1>
           <p key={headerPhrase.text} className="app-header__phrase" title={headerPhrase.text}>

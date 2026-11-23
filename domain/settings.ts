@@ -2,6 +2,8 @@ import type { AiringEvent } from "./airing";
 import type { ThemePreference } from "../features/theme/theme";
 
 export type AppSettings = {
+  launcherEnabled: boolean;
+  glassEnabled: boolean;
   notificationsEnabled: boolean;
   badgeEnabled: boolean;
   themePreference: ThemePreference;
@@ -20,6 +22,8 @@ export type ScheduledAiringEvent = AiringEvent & {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  launcherEnabled: true,
+  glassEnabled: true,
   notificationsEnabled: true,
   badgeEnabled: true,
   themePreference: "auto",

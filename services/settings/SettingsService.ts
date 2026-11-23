@@ -20,7 +20,7 @@ export class SettingsService {
   }
 
   async updateSettings(
-    patch: Partial<Pick<AppSettings, "notificationsEnabled" | "badgeEnabled" | "themePreference">>
+    patch: Partial<Omit<AppSettings, "timezoneMode">>
   ): Promise<AppSettings> {
     const current = await this.repository.getSettings();
     const next: AppSettings = { ...current, ...patch, timezoneMode: "local" };

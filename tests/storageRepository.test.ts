@@ -127,10 +127,21 @@ describe("AppRepository", () => {
     const settings = await new AppRepository(storage).getSettings();
 
     expect(settings).toEqual({
+      launcherEnabled: true,
+      glassEnabled: true,
       notificationsEnabled: false,
       badgeEnabled: true,
       themePreference: "auto",
       timezoneMode: "local"
+    });
+  });
+
+  it("keeps disabled launcher and glass preferences when the dashboard reopens", async () => {
+    const storage = new MemoryStorage();
+    const first = new AppRepository(storage);
+    await first.saveSettings({ ...await first.getSettings(), launcherEnabled: false, glassEnabled: false });
+    expect(await new AppRepository(storage).getSettings()).toMatchObject({
+      launcherEnabled: false, glassEnabled: false
     });
   });
 });
